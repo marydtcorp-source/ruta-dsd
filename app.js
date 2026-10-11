@@ -221,6 +221,8 @@
 
   // ---------- Modelo de días ----------
   const newDay = (date = '') => ({ id: uid(), date, settleNo: '', cash: {}, rows: [], total: null, hasReport: false, reportThumb: '', pages: [] });
+  // Si el usuario corrige filas, el total del día (y de la hoja del PDF) pasa a ser la suma de las filas
+  const recalcTotal = (d) => { d.total = Math.round(sumDay(d) * 100) / 100; d.totalDerived = true; d.reportOk = true; };
   const sumDay = (d) => d.rows.reduce((s, r) => s + (Number(r.amount) || 0), 0);
   const money = (n) => Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -588,7 +590,7 @@
       });
       el.addEventListener('change', (e) => {
         if (e.target.dataset.k === 'col') d.rows[+e.target.dataset.r].col = +e.target.value;
-        if (['amount', 'invoice'].includes(e.target.dataset.k) || e.target.dataset.f === 'date') { if (e.target.dataset.f === 'date') mergeSameDate(); analyze(d); render(); }
+        if (['amount', 'invoice'].includes(e.target.dataset.k) || e.target.dataset.f === 'date') { if (e.target.dataset.f === 'date') mergeSameDate(); if (e.target.dataset.k === 'amount') recalcTotal(d); analyze(d); render(); }
         save();
       });
       el.addEventListener('click', (e) => {
@@ -597,7 +599,7 @@
         if (act === 'saveday') { saveDay(d); return; }
         if (act === 'delday') { if (!confirm('¿Borrar este día?')) return; putDpdf(d.id, null); state.days = state.days.filter((x) => x !== d); state.seen = []; }
         else if (act === 'addrow') d.rows.push({ store: '', invoice: '', amount: null });
-        else if (act === 'delrow') d.rows.splice(+b.dataset.r, 1);
+        else if (act === 'delrow') { d.rows.splice(+b.dataset.r, 1); recalcTotal(d); }
         else if (act === 'delpg') d.pages.splice(i, 1);
         else if (act === 'up' && i > 0) [d.pages[i - 1], d.pages[i]] = [d.pages[i], d.pages[i - 1]];
         else if (act === 'down' && i < d.pages.length - 1) [d.pages[i + 1], d.pages[i]] = [d.pages[i], d.pages[i + 1]];
