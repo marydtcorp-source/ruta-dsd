@@ -1,6 +1,12 @@
 (function () {
   const $ = (id) => document.getElementById(id);
-  const msg = (t) => ($('msg').textContent = t);
+  let toastT = 0;
+  const msg = (t) => {
+    $('msg').textContent = t; const el = $('toast');
+    el.classList.toggle('show', !!t); clearTimeout(toastT);
+    if (t && !/…$/.test(t)) toastT = setTimeout(() => el.classList.remove('show'), 6000);
+  };
+  const ic = (n, c = '') => `<svg class="ic ${c}"><use href="#i-${n}"/></svg>`;
   const DEF = { week: '', route: '708-100', ibp: 'RIVMAR GROUP LLC', fullInvoice: false };
   let state = { cfg: { ...DEF }, days: [], seen: [] };
   const NATIVE = !!(window.Capacitor && Capacitor.isNativePlatform && Capacitor.isNativePlatform());
@@ -428,6 +434,7 @@
       }
       await Promise.all(lanesP);
       mergeSameDate(); repairCodes(); reconcile();
+      if (batchCur) openDays.add(batchCur.id);
       state.days.forEach((d) => { markCash(d); analyze(d); sortByReport(d); });
       let extra = '';
       if (pcStats.n) extra += ` Lector de la PC: ${pcStats.n} foto(s)` + (pcStats.err ? `, ${pcStats.err} con el lector del teléfono.` : '.');
@@ -470,10 +477,10 @@
     render(); save();
   }
 
-  async function rotatePage(day, i) {
+  async function rotatePage(day, i, deg = 90) {
     const pg = day.pages[i], img = await loadImg(pg.dataUrl);
     const c = document.createElement('canvas'); c.width = img.naturalWidth; c.height = img.naturalHeight;
-    c.getContext('2d').drawImage(img, 0, 0); pg.dataUrl = toJpeg(rotateCanvas(c, 90)); pg.rot = ((pg.rot || 0) + 90) % 360; render(); save();
+    c.getContext('2d').drawImage(img, 0, 0); pg.dataUrl = toJpeg(rotateCanvas(c, deg)); pg.rot = ((pg.rot || 0) + deg) % 360; render(); save();
     if (pg.type === 'other') await rereadPage(day, i); // al girar una foto no reconocida, se vuelve a leer sola
   }
 
@@ -490,12 +497,13 @@
   const fmtDate = (t) => new Date(t).toLocaleString('es', { dateStyle: 'short', timeStyle: 'short' });
   function renderArchive() {
     const box = $('archive'), saved = state.days.filter((d) => d.savedSig).sort((a, b) => PdfGen.dateKey(a.date) - PdfGen.dateKey(b.date));
-    box.hidden = !saved.length && !arch.length && !state.days.length;
+    box.hidden = !saved.length && !arch.length;
+    const f = (icon, name, meta, dl, del) => `<div class="f"><span class="f-ic">${ic(icon)}</span><span class="f-main"><div class="f-name">${name}</div><div class="f-meta">${meta}</div></span>
+      <button class="iconbtn" ${dl} aria-label="Descargar">${ic('download', 'sm')}</button><button class="iconbtn bad" ${del} aria-label="Borrar">${ic('trash', 'sm')}</button></div>`;
     const rows = [];
-    saved.forEach((d) => rows.push(`<div class="row" style="margin:4px 0"><span class="grow">📄 ${dayFile(d)} <span class="pill">día · en la app</span></span><button class="sec sm" data-a="dl-day" data-id="${d.id}">Descargar</button><button class="danger sm" data-a="del-day" data-id="${d.id}">Borrar PDF</button></div>`));
-    arch.forEach((w) => rows.push(`<div class="row" style="margin:4px 0"><span class="grow">📚 ${w.name} <span class="pill">semana · ${fmtDate(w.ts)} · ${(w.size / 1048576).toFixed(1)} MB</span></span><button class="sec sm" data-a="dl-week" data-id="${w.id}">Descargar</button><button class="danger sm" data-a="del-week" data-id="${w.id}">Borrar</button></div>`));
-    box.innerHTML = `<h2>Archivos guardados en la app</h2><p style="margin:0 0 6px;color:var(--mut);font-size:13px">Nada se borra solo: tú decides. Cada día guardado queda aquí hasta que lo borres; la semana finalizada también.</p>${rows.join('') || '<p style="font-size:13px;color:var(--mut)">Aún no hay archivos guardados.</p>'}
-      <div class="row" style="margin-top:8px"><button class="danger sm" data-a="clear-days" ${state.days.length ? '' : 'hidden'}>Borrar los días y fotos de la pantalla (empezar semana nueva)</button></div>`;
+    saved.forEach((d) => rows.push(f('doc', dayFile(d), 'PDF del día · guardado en la app', `data-a="dl-day" data-id="${d.id}"`, `data-a="del-day" data-id="${d.id}"`)));
+    arch.forEach((w) => rows.push(f('stack', w.name, `Semana finalizada · ${fmtDate(w.ts)} · ${(w.size / 1048576).toFixed(1)} MB`, `data-a="dl-week" data-id="${w.id}"`, `data-a="del-week" data-id="${w.id}"`)));
+    box.innerHTML = `<h2>Archivos guardados</h2><p style="margin:0 0 6px;color:var(--mut);font-size:13px">Nada se borra solo: tú decides cuándo.</p>${rows.join('')}`;
   }
   $('archive').addEventListener('click', async (e) => {
     const b = e.target.closest('button'); if (!b) return;
@@ -533,50 +541,78 @@
 
   // ---------- Render ----------
   const esc = (s) => String(s ?? '').replace(/"/g, '&quot;');
+  const openDays = new Set();
+  let openInit = false;
+  const WD = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'], MO = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+  function dayTitle(date) {
+    const m = String(date || '').match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (!m) return date || '(sin fecha)';
+    const dt = new Date(+m[3], +m[1] - 1, +m[2]);
+    if (isNaN(dt)) return date;
+    const w = WD[dt.getDay()];
+    return w.charAt(0).toUpperCase() + w.slice(1) + ' ' + dt.getDate() + ' ' + MO[dt.getMonth()] + (dt.getFullYear() !== new Date().getFullYear() ? ' ' + dt.getFullYear() : '');
+  }
   function render() {
     $('week').value = state.cfg.week; $('route').value = state.cfg.route; $('ibp').value = state.cfg.ibp; $('fullInv').checked = !!state.cfg.fullInvoice;
+    $('hdrSub').textContent = [state.cfg.week ? 'Semana ' + state.cfg.week : '', state.cfg.route].filter(Boolean).join(' · ') || 'Armar semana';
     renderProfiles(); renderArchive();
     $('ocrServer').value = state.cfg.ocrServer || ''; $('autoCrop').checked = state.cfg.autoCrop !== false;
     const box = $('days'); box.innerHTML = '';
     const days = [...state.days].sort((a, b) => PdfGen.dateKey(a.date) - PdfGen.dateKey(b.date));
+    if (!openInit && days.length) { openDays.add(days[days.length - 1].id); openInit = true; }
     let week = 0;
     days.forEach((d) => {
-      const t = sumDay(d); week += d.total != null ? d.total : t;
+      const t = sumDay(d); const dayTot = d.total != null ? d.total : t; week += dayTot;
       const inv = d.pages.filter((p) => p.type === 'invoice').length, pod = d.pages.filter((p) => p.type === 'pod').length;
-      const el = document.createElement('div'); el.className = 'card';
+      const open = openDays.has(d.id);
+      const saved = d.savedSig && d.savedSig === sigOf(d), changed = d.savedSig && !saved;
+      const pill = !d.hasReport ? '<span class="pill warn">Falta reporte</span>' : changed ? '<span class="pill warn">Cambió</span>' : saved ? `<span class="pill ok">${ic('check', 'sm')}Guardado</span>` : '<span class="pill">Sin guardar</span>';
+      const thumb = d.pages[0] ? `<img src="${d.pages[0].dataUrl}" alt="">` : d.reportThumb ? `<img src="${d.reportThumb}" alt="">` : ic('doc');
+      const meta = (d.pages.length ? `${d.pages.length} págs` : 'sin fotos') + (inv ? ` · ${inv} inv` : '') + (pod ? ` · ${pod} POD` : '') + (d.rows.length ? ` · ${d.rows.length} facturas` : '');
+      const el = document.createElement('article'); el.className = 'day' + (open ? ' open' : '');
       el.innerHTML = `
-        <div class="row"><h2 class="grow">Día ${d.date || '(sin fecha)'} ${d.settleNo ? '· settlement ' + d.settleNo : ''}</h2>
-          <span class="pill">${d.pages.length} págs · ${inv} inv · ${pod} POD</span>
-          <button class="danger sm" data-act="delday">Borrar</button></div>
-        <div class="row" style="margin:6px 0"><button class="sm" data-act="saveday">💾 Guardar día (PDF)</button>${d.savedSig ? (d.savedSig === sigOf(d) ? '<span class="pill ok">✓ Día guardado</span>' : '<span class="pill bad">Cambió desde que lo guardaste: guárdalo de nuevo</span>') : '<span class="pill">Sin guardar</span>'}</div>
-        ${d.hasReport ? '' : '<div class="bad" style="margin:6px 0">⚠ Falta la foto del Settlement Report de este día (de ahí salen los datos de la hoja).</div>'}
-        ${d.cash && d.cash.cashSales > 0 ? `<div class="pill" style="margin:6px 0">Efectivo del settlement: $${money(d.cash.cashSales)}</div>` : ''}
-        <label>Fecha (MM/DD/AAAA)</label><input type="text" data-f="date" value="${esc(d.date)}" placeholder="10/06/2026">
-        <table><thead><tr><th>Invoice #</th><th>Monto</th><th>Col.</th><th></th></tr></thead><tbody></tbody></table>
-        <div class="row"><button class="sec sm" data-act="addrow">+ fila</button>
-          <button class="sec sm" data-act="sort">Ordenar fotos por reporte</button>
-          ${d.reportThumb ? '<button class="sec sm" data-act="viewrep">Ver reporte</button>' : ''}</div>
-        <div class="tot"><span>Total del día (settlement)</span><span>$${money(d.total != null ? d.total : t)}</span></div>
-        ${d.hasReport && d.reportOk === false && !d.totalDerived ? `<div class="bad" style="margin:4px 0;font-size:13px">⚠ Este reporte no cuadra consigo mismo (las facturas no suman el total o los subtotales): puede faltar alguna factura o haber un número mal leído. Compáralo con la foto (botón "Ver reporte") y corrige la tabla.</div>` : ''}
-        ${d.hasReport && d.totalDerived ? `<div class="pill" style="margin:4px 0">No se pudo leer el Total impreso: lo calculé sumando las facturas. Confirma con la foto que estén todas.</div>` : ''}
-        ${d.hasReport && d.fixes ? `<div class="pill" style="margin:4px 0">Corregí ${d.fixes} valor(es) con las sumas del propio reporte</div>` : ''}
-        <div class="thumbs"></div>`;
+        <button class="day-head" data-act="toggle" aria-expanded="${open}">
+          <span class="day-thumb">${thumb}</span>
+          <span class="day-main"><span class="day-title">${dayTitle(d.date)}</span><span class="day-sub">${meta}</span></span>
+          <span class="day-side"><span class="day-total">$${money(dayTot)}</span>${pill}</span>
+          ${ic('chev', 'chev')}
+        </button>
+        <div class="day-body" ${open ? '' : 'hidden'}>
+          <div class="actions">
+            <button class="primary" data-act="saveday">${ic('doc')}Guardar día (PDF)</button>
+            ${d.reportThumb ? `<button class="ghost sm" data-act="viewrep">${ic('eye', 'sm')}Ver reporte</button>` : ''}
+            <button class="ghost sm" data-act="sort">${ic('sort', 'sm')}Ordenar fotos</button>
+          </div>
+          ${d.hasReport ? '' : `<div class="note warn">${ic('alert', 'sm')}<span>Falta la foto del Settlement Report de este día: de ahí salen los datos de la hoja.</span></div>`}
+          ${changed ? `<div class="note warn">${ic('info', 'sm')}<span>Cambió desde que lo guardaste. Guárdalo de nuevo.</span></div>` : ''}
+          <div class="row" style="align-items:flex-end;margin-top:4px">
+            <div class="grow"><label>Fecha (MM/DD/AAAA)</label><input type="text" data-f="date" value="${esc(d.date)}" placeholder="10/06/2026" inputmode="numeric"></div>
+            ${d.cash && d.cash.cashSales > 0 ? `<span class="pill" style="margin-bottom:10px">Efectivo $${money(d.cash.cashSales)}</span>` : ''}
+          </div>
+          <h3>Facturas</h3>
+          <table><thead><tr><th>Invoice #</th><th>Monto</th><th>Col.</th><th></th></tr></thead><tbody></tbody></table>
+          <button class="sec sm" data-act="addrow">${ic('plus', 'sm')}Agregar fila</button>
+          <div class="tot"><span>Total del día</span><span>$${money(dayTot)}</span></div>
+          ${d.hasReport && d.reportOk === false && !d.totalDerived ? `<div class="note bad">${ic('alert', 'sm')}<span>Este reporte no cuadra consigo mismo: puede faltar una factura o haber un número mal leído. Compáralo con la foto (Ver reporte) y corrige la tabla.</span></div>` : ''}
+          ${d.hasReport && d.totalDerived ? `<div class="note">${ic('info', 'sm')}<span>El total sale de sumar las facturas. Confirma con la foto que estén todas.</span></div>` : ''}
+          ${d.hasReport && d.fixes ? `<div class="note">${ic('info', 'sm')}<span>Corregí ${d.fixes} valor(es) con las sumas del propio reporte.</span></div>` : ''}
+          <h3>Páginas${d.pages.length ? ' · ' + d.pages.length : ''}</h3>
+          <div class="thumbs"></div>
+          <button class="danger linkdel" data-act="delday">${ic('trash', 'sm')}Borrar este día</button>
+        </div>`;
       const tb = el.querySelector('tbody');
       d.rows.forEach((r, i) => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `<td><input type="text" data-r="${i}" data-k="invoice" value="${esc(r.invoice)}"></td>
-          <td><input type="text" inputmode="decimal" data-r="${i}" data-k="amount" value="${r.amount ?? ''}" style="width:84px"></td>
-          <td><select data-r="${i}" data-k="col"><option value="5"${(r.col ?? (r.amount < 0 ? 6 : 5)) === 5 ? ' selected' : ''}>Charge</option><option value="4"${r.col === 4 ? ' selected' : ''}>Cash</option><option value="6"${(r.col ?? (r.amount < 0 ? 6 : 5)) === 6 ? ' selected' : ''}>Credit</option></select></td>
-          <td><button class="danger sm" data-act="delrow" data-r="${i}">×</button></td>`;
+        const tr = document.createElement('tr'), col = r.col ?? (r.amount < 0 ? 6 : 5);
+        tr.innerHTML = `<td><input type="text" inputmode="numeric" data-r="${i}" data-k="invoice" value="${esc(r.invoice)}" aria-label="Invoice"></td>
+          <td style="width:84px"><input type="text" class="num" inputmode="decimal" data-r="${i}" data-k="amount" value="${r.amount ?? ''}" aria-label="Monto"></td>
+          <td style="width:74px"><select data-r="${i}" data-k="col" aria-label="Columna"><option value="5"${col === 5 ? ' selected' : ''}>Charge</option><option value="4"${col === 4 ? ' selected' : ''}>Cash</option><option value="6"${col === 6 ? ' selected' : ''}>Credit</option></select></td>
+          <td><button class="danger del" data-act="delrow" data-r="${i}" aria-label="Quitar fila">${ic('close', 'sm')}</button></td>`;
         tb.appendChild(tr);
       });
       const th = el.querySelector('.thumbs');
       d.pages.forEach((p, i) => {
-        const x = document.createElement('div'); x.className = 'th';
-        x.innerHTML = `<img src="${p.dataUrl}"><div class="bar"><span class="pill">${TYPES[p.type] || p.type}${p.row >= 0 ? ' #' + (p.row + 1) : ''}</span></div>
-          <div class="bar"><button class="sec sm" data-act="up" data-i="${i}">◀</button><button class="sec sm" data-act="rot" data-i="${i}">⟳</button><button class="sec sm" data-act="reread" data-i="${i}">🔍</button><button class="sec sm" data-act="crop" data-i="${i}">✂</button>
-          <button class="sec sm" data-act="type" data-i="${i}">tipo</button><button class="danger sm" data-act="delpg" data-i="${i}">×</button>
-          <button class="sec sm" data-act="down" data-i="${i}">▶</button></div>`;
+        const x = document.createElement('button'); x.className = 'th'; x.dataset.act = 'page'; x.dataset.i = i; x.dataset.type = p.type; x.setAttribute('aria-label', 'Página ' + (i + 1) + ': ' + (TYPES[p.type] || p.type));
+        x.innerHTML = `<img src="${p.dataUrl}" alt=""><span class="num">${i + 1}</span><span class="badge">${TYPES[p.type] || p.type}${p.row >= 0 ? ' #' + (p.row + 1) : ''}</span>`;
         th.appendChild(x);
       });
       el.addEventListener('input', (e) => {
@@ -596,29 +632,98 @@
       el.addEventListener('click', (e) => {
         const b = e.target.closest('button'); if (!b) return;
         const act = b.dataset.act, i = +b.dataset.i;
+        if (act === 'toggle') { if (openDays.has(d.id)) openDays.delete(d.id); else openDays.add(d.id); render(); return; }
         if (act === 'saveday') { saveDay(d); return; }
+        if (act === 'page') { openPageSheet(d, i); return; }
         if (act === 'delday') { if (!confirm('¿Borrar este día?')) return; putDpdf(d.id, null); state.days = state.days.filter((x) => x !== d); state.seen = []; }
         else if (act === 'addrow') d.rows.push({ store: '', invoice: '', amount: null });
         else if (act === 'delrow') { d.rows.splice(+b.dataset.r, 1); recalcTotal(d); }
-        else if (act === 'delpg') d.pages.splice(i, 1);
-        else if (act === 'up' && i > 0) [d.pages[i - 1], d.pages[i]] = [d.pages[i], d.pages[i - 1]];
-        else if (act === 'down' && i < d.pages.length - 1) [d.pages[i + 1], d.pages[i]] = [d.pages[i], d.pages[i + 1]];
-        else if (act === 'type') { const ks = Object.keys(TYPES); d.pages[i].type = ks[(ks.indexOf(d.pages[i].type) + 1) % ks.length]; }
         else if (act === 'sort') { analyze(d); sortByReport(d); }
-        else if (act === 'viewrep') { const w = window.open(); w.document.write(`<img src="${d.reportThumb}" style="max-width:100%">`); return; }
-        else if (act === 'rot') { rotatePage(d, i); return; }
-        else if (act === 'reread') { rereadPage(d, i); return; }
-        else if (act === 'crop') { editCrop(d, i); return; }
+        else if (act === 'viewrep') { openViewer(d.reportThumb, 'Settlement Report · ' + dayTitle(d.date)); return; }
         else return;
         analyze(d); render(); save();
       });
       box.appendChild(el);
     });
+    $('empty').hidden = days.length > 0; $('daysFoot').hidden = false;
+    const wb = $('weekBar'); wb.hidden = !days.length;
     if (days.length) {
-      const w = document.createElement('div'); w.className = 'card tot';
-      w.innerHTML = `<span>TOTAL SEMANA</span><span>$${money(week)}</span>`; box.appendChild(w);
+      const nSaved = days.filter((d) => d.savedSig && d.savedSig === sigOf(d)).length;
+      wb.innerHTML = `<div class="k"><b>Total semana</b>${days.length} ${days.length === 1 ? 'día' : 'días'} · ${nSaved} guardado${nSaved === 1 ? '' : 's'}</div><div class="v">$${money(week)}</div>`;
     }
+    refreshSheet();
   }
+
+  // ---------- Hoja de herramientas de una página ----------
+  let ps = null; // { day, id } o { viewer: true }
+  function openViewer(url, title) {
+    ps = { viewer: true };
+    $('psTitle').textContent = title; $('psImg').src = url; $('psPanel').hidden = true; $('pageSheet').hidden = false;
+  }
+  function openPageSheet(day, i) {
+    ps = { day, id: day.pages[i].id };
+    $('psPanel').hidden = false; $('pageSheet').hidden = false; refreshSheet();
+  }
+  function closeSheet() { ps = null; $('pageSheet').hidden = true; $('psImg').classList.remove('loading'); }
+  function refreshSheet() {
+    if (!ps || ps.viewer) return;
+    if (!state.days.includes(ps.day)) return closeSheet();
+    const i = ps.day.pages.findIndex((p) => p.id === ps.id);
+    if (i < 0) return closeSheet();
+    const pg = ps.day.pages[i];
+    $('psTitle').textContent = 'Página ' + (i + 1) + ' de ' + ps.day.pages.length;
+    $('psImg').src = pg.dataUrl; $('psImg').classList.remove('loading');
+    [...$('psType').children].forEach((b) => b.classList.toggle('on', b.dataset.t === pg.type));
+    [...$('psFilter').children].forEach((b) => b.classList.toggle('on', b.dataset.f === (pg.filter || 'bw')));
+    const tl = (n) => $('pageSheet').querySelector('[data-p="' + n + '"]');
+    tl('left').disabled = i === 0; tl('right').disabled = i === ps.day.pages.length - 1;
+    getSrc(pg.id).then((u) => { if (ps && ps.id === pg.id) { tl('crop').disabled = !u; [...$('psFilter').children].forEach((b) => (b.disabled = !u)); } });
+  }
+  // Filtro de la página a partir del original guardado: B/N limpio, gris o color
+  async function applyFilter(day, pg, mode) {
+    const url = await getSrc(pg.id);
+    if (!url) return msg('Esta foto no tiene el original guardado.');
+    msg('Aplicando filtro…'); $('psImg').classList.add('loading');
+    try {
+      const img = await loadImg(url), W = img.naturalWidth, H = img.naturalHeight;
+      const c0 = document.createElement('canvas'); c0.width = W; c0.height = H; c0.getContext('2d').drawImage(img, 0, 0);
+      let c = pg.quadN ? await DocScan.warp(c0, pg.quadN.map((p) => [p[0] * W, p[1] * H])) : c0;
+      c = scaleCanvas(c, 2000);
+      if (mode === 'bw') { try { c = await DocScan.cleanScan(c); } catch (e) { c = flatten(c); } }
+      c = rotateCanvas(c, pg.rot || 0);
+      const out = scaleCanvas(c, 1500);
+      pg.dataUrl = toJpeg(mode === 'color' ? out : gray(out)); pg.filter = mode;
+      msg('Filtro aplicado.');
+    } catch (e) { console.error(e); msg('No pude aplicar el filtro: ' + (e.message || e)); }
+    render(); save();
+  }
+  $('psClose').addEventListener('click', closeSheet);
+  $('psType').addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b || !ps || ps.viewer) return;
+    const pg = ps.day.pages.find((p) => p.id === ps.id); if (!pg) return;
+    pg.type = b.dataset.t; analyze(ps.day); render(); save();
+  });
+  $('psFilter').addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b || !ps || ps.viewer) return;
+    const pg = ps.day.pages.find((p) => p.id === ps.id); if (pg && (pg.filter || 'bw') !== b.dataset.f) applyFilter(ps.day, pg, b.dataset.f);
+  });
+  $('psPanel').addEventListener('click', async (e) => {
+    const b = e.target.closest('button[data-p]'); if (!b || !ps || ps.viewer) return;
+    const day = ps.day, i = day.pages.findIndex((p) => p.id === ps.id); if (i < 0) return;
+    const a = b.dataset.p;
+    if (a === 'crop') { await editCrop(day, i); return; }
+    if (a === 'rotl') { await rotatePage(day, i, 270); return; }
+    if (a === 'rotr') { await rotatePage(day, i, 90); return; }
+    if (a === 'reread') { await rereadPage(day, i); return; }
+    if (a === 'left' && i > 0) [day.pages[i - 1], day.pages[i]] = [day.pages[i], day.pages[i - 1]];
+    else if (a === 'right' && i < day.pages.length - 1) [day.pages[i + 1], day.pages[i]] = [day.pages[i], day.pages[i + 1]];
+    else if (a === 'del') { if (!confirm('¿Eliminar esta página?')) return; day.pages.splice(i, 1); analyze(day); closeSheet(); }
+    render(); save();
+  });
+  // Ajustes
+  $('cfgBtn').addEventListener('click', () => { $('cfgSheet').hidden = false; });
+  $('cfgClose').addEventListener('click', () => { $('cfgSheet').hidden = true; });
+  $('camDone').addEventListener('click', () => $('camClose').click());
 
 
   // ---------- Editor de recorte (4 esquinas arrastrables) ----------
@@ -627,7 +732,7 @@
     if (!url) return msg('No hay original guardado de esta foto.');
     const img = await loadImg(url), W = img.naturalWidth, H = img.naturalHeight;
     const box = $('editor'), cv = $('edc'), g = cv.getContext('2d');
-    const maxW = Math.min(window.innerWidth - 24, 900), maxH = window.innerHeight - 140;
+    const maxW = Math.min(window.innerWidth - 24, 900), maxH = window.innerHeight - 190;
     const s = Math.min(maxW / W, maxH / H);
     cv.width = Math.round(W * s); cv.height = Math.round(H * s);
     let q = (pg.quadN || [[0.05, 0.05], [0.95, 0.05], [0.95, 0.95], [0.05, 0.95]]).map((p) => [p[0] * cv.width, p[1] * cv.height]);
@@ -636,8 +741,8 @@
       g.clearRect(0, 0, cv.width, cv.height); g.drawImage(img, 0, 0, cv.width, cv.height);
       g.fillStyle = 'rgba(0,0,0,.45)'; g.beginPath(); g.rect(0, 0, cv.width, cv.height);
       g.moveTo(q[0][0], q[0][1]); q.slice(1).forEach((p) => g.lineTo(p[0], p[1])); g.closePath(); g.fill('evenodd');
-      g.strokeStyle = '#3ccf9c'; g.lineWidth = 2; g.beginPath(); g.moveTo(q[0][0], q[0][1]); q.slice(1).forEach((p) => g.lineTo(p[0], p[1])); g.closePath(); g.stroke();
-      q.forEach((p) => { g.fillStyle = '#3ccf9c'; g.beginPath(); g.arc(p[0], p[1], 13, 0, 7); g.fill(); g.strokeStyle = '#fff'; g.lineWidth = 2; g.stroke(); });
+      g.strokeStyle = '#ff8f1f'; g.lineWidth = 2.5; g.beginPath(); g.moveTo(q[0][0], q[0][1]); q.slice(1).forEach((p) => g.lineTo(p[0], p[1])); g.closePath(); g.stroke();
+      q.forEach((p) => { g.fillStyle = '#ff8f1f'; g.beginPath(); g.arc(p[0], p[1], 14, 0, 7); g.fill(); g.strokeStyle = '#fff'; g.lineWidth = 2; g.stroke(); });
     };
     const pos = (e) => { const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) * (cv.width / r.width), (e.clientY - r.top) * (cv.height / r.height)]; };
     cv.onpointerdown = (e) => { const p = pos(e); let b = 1e9; q.forEach((v, k) => { const d = Math.hypot(v[0] - p[0], v[1] - p[1]); if (d < b) { b = d; drag = k; } }); if (b > 60) drag = -1; else cv.setPointerCapture(e.pointerId); };
@@ -861,18 +966,20 @@
     const q = $('queue'); q.innerHTML = '';
     queue.forEach((it, i) => {
       const d = document.createElement('div'); d.className = 'th';
-      d.innerHTML = `<img src="${it.url}"><div class="bar"><span class="pill">${i + 1}</span><button class="danger sm" data-i="${i}">×</button></div>`;
+      d.innerHTML = `<img src="${it.url}" alt=""><span class="num">${i + 1}</span><button class="del" data-i="${i}" aria-label="Quitar foto">${ic('close', 'sm')}</button>`;
       q.appendChild(d);
     });
     $('qbar').hidden = !queue.length;
-    $('qcount').textContent = queue.length + ' foto(s) en cola';
+    document.body.classList.toggle('has-tray', queue.length > 0);
+    $('qcount').textContent = queue.length + (queue.length === 1 ? ' foto lista' : ' fotos listas');
+    q.scrollLeft = q.scrollWidth;
   }
   function enqueue(files) {
     files.forEach((f) => queue.push({ file: f, url: URL.createObjectURL(f) }));
-    renderQueue(); msg(queue.length + ' foto(s) en cola. Sigue agregando o toca Procesar todo.');
+    renderQueue(); msg(queue.length + ' foto(s) lista(s). Sigue agregando o toca Procesar todo.');
   }
   $('queue').addEventListener('click', (e) => {
-    const b = e.target.closest('button'); if (!b) return;
+    const b = e.target.closest('button'); if (!b || !queue[+b.dataset.i]) return;
     URL.revokeObjectURL(queue[+b.dataset.i].url); queue.splice(+b.dataset.i, 1); renderQueue();
   });
   $('qclear').addEventListener('click', () => { queue.forEach((x) => URL.revokeObjectURL(x.url)); queue = []; renderQueue(); });
@@ -890,7 +997,7 @@
     try {
       camStream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: { ideal: 'environment' }, width: { ideal: 4096 }, height: { ideal: 3072 } } });
     } catch (e) { msg('No pude abrir la cámara (' + e.name + '). Uso la cámara normal.'); $('camIn').click(); return; }
-    camShots = 0; $('camCount').textContent = '0';
+    camShots = 0; $('camCount').textContent = '0'; $('camThumb').style.backgroundImage = '';
     $('camV').srcObject = camStream; $('camera').hidden = false;
     try { await $('camV').play(); } catch (e) { /* autoplay */ }
   }
@@ -907,7 +1014,7 @@
     if (navigator.vibrate) navigator.vibrate(20);
     const blob = await new Promise((res) => c.toBlob(res, 'image/jpeg', 0.92));
     enqueue([new File([blob], 'cam-' + Date.now() + '.jpg', { type: 'image/jpeg' })]);
-    $('camCount').textContent = String(++camShots);
+    $('camCount').textContent = String(++camShots); $('camThumb').style.backgroundImage = 'url(' + queue[queue.length - 1].url + ')';
   }
   $('camBtn').addEventListener('click', openCamera);
   $('camClose').addEventListener('click', closeCamera);

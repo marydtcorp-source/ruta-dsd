@@ -2,149 +2,415 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Ruta DSD</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
-<meta name="theme-color" content="#0b6b4f">
+<meta name="theme-color" content="#f3f3f5" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0f0f10" media="(prefers-color-scheme: dark)">
+<meta name="color-scheme" content="light dark">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Ruta DSD">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <style>
-  :root { --bg:#f4f5f7; --card:#fff; --ink:#1b1f24; --mut:#667085; --acc:#0b6b4f; --err:#b42318; --ln:#d9dde3; }
-  @media (prefers-color-scheme: dark) { :root { --bg:#14171a; --card:#1d2227; --ink:#eceff3; --mut:#9aa4b0; --acc:#3ccf9c; --err:#ff8a80; --ln:#323a42; } }
+  :root {
+    --bg:#f3f3f5; --surf:#fff; --surf2:#f7f7f9; --ink:#1c1c1e; --mut:#6b6b73; --ln:#e3e3e8;
+    --acc:#ee7500; --acc-ink:#b45309; --acc-soft:#fff1e2; --on-acc:#201000;
+    --err:#c0341d; --err-soft:#fdeeea; --ok:#1f7a45; --ok-soft:#e8f6ee; --warn-soft:#fff6dc;
+    --shadow:0 1px 2px rgba(20,20,30,.06), 0 6px 20px rgba(20,20,30,.07);
+    --dock:84px;
+    --ease:cubic-bezier(.22,1,.36,1);
+  }
+  @media (prefers-color-scheme: dark) { :root {
+    --bg:#0f0f10; --surf:#1b1b1d; --surf2:#252528; --ink:#f2f2f4; --mut:#a1a1aa; --ln:#2e2e33;
+    --acc:#ff8f1f; --acc-ink:#ffab57; --acc-soft:#33210f;
+    --err:#ff8a7a; --err-soft:#3a1d19; --ok:#58d68d; --ok-soft:#14301f; --warn-soft:#352c10;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35);
+  } }
   [hidden] { display:none !important; }
-  * { box-sizing:border-box; }
-  body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; padding-bottom:90px; }
-  header { padding:14px 16px; font-weight:700; font-size:18px; }
-  main { max-width:760px; margin:0 auto; padding:0 12px; }
-  .card { background:var(--card); border:1px solid var(--ln); border-radius:12px; padding:12px; margin:0 0 12px; }
-  h2 { font-size:15px; margin:0 0 8px; }
-  label { display:block; font-size:12px; color:var(--mut); margin:6px 0 2px; }
-  input[type=text], input[type=number] { width:100%; padding:9px; font-size:16px; border:1px solid var(--ln); border-radius:8px; background:var(--bg); color:var(--ink); }
-  .grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; }
-  button, .btn { appearance:none; border:0; border-radius:10px; padding:11px 14px; font-size:15px; font-weight:600; background:var(--acc); color:#fff; cursor:pointer; display:inline-block; text-align:center; }
-  button.sec, .btn.sec { background:transparent; color:var(--acc); border:1px solid var(--acc); }
-  button.sm { padding:6px 9px; font-size:13px; }
-  button.danger { background:transparent; color:var(--err); border:1px solid var(--err); }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html { color-scheme:light dark; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; padding-bottom:calc(var(--dock) + 150px + env(safe-area-inset-bottom)); -webkit-text-size-adjust:100%; }
+  ::selection { background:var(--acc); color:var(--on-acc); }
+  :focus-visible { outline:2px solid var(--acc); outline-offset:2px; }
+  .ic { width:22px; height:22px; flex:none; fill:none; stroke:currentColor; stroke-width:1.75; stroke-linecap:round; stroke-linejoin:round; }
+  .ic.sm { width:18px; height:18px; }
+  .flip { transform:scaleX(-1); }
+
+  /* ---------- Barra superior ---------- */
+  .appbar { position:sticky; top:0; z-index:5; background:color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter:saturate(1.4) blur(14px); -webkit-backdrop-filter:saturate(1.4) blur(14px); padding:calc(10px + env(safe-area-inset-top)) 16px 10px; }
+  .appbar-in { max-width:640px; margin:0 auto; display:flex; align-items:center; gap:12px; }
+  .brand { flex:1; min-width:0; }
+  .brand h1 { margin:0; font-size:26px; line-height:1.1; font-weight:800; letter-spacing:-.02em; }
+  .brand p { margin:2px 0 0; font-size:13px; color:var(--mut); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .iconbtn { appearance:none; border:0; background:var(--surf); color:var(--ink); width:44px; height:44px; border-radius:50%; display:inline-grid; place-items:center; padding:0; cursor:pointer; box-shadow:var(--shadow); }
+  .iconbtn:active { transform:scale(.94); }
+  main { max-width:640px; margin:0 auto; padding:4px 16px 0; }
+
+  /* ---------- Controles base ---------- */
+  button, .btn { appearance:none; border:0; border-radius:12px; padding:0 16px; min-height:44px; font:inherit; font-size:15px; font-weight:650; background:var(--acc); color:var(--on-acc); cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:8px; text-align:center; transition:transform .15s var(--ease), background-color .15s; }
+  button:active, .btn:active { transform:scale(.97); }
+  button:disabled { opacity:.45; pointer-events:none; }
+  button.sec, .btn.sec, button.ghost { background:var(--surf2); color:var(--ink); border:1px solid var(--ln); }
+  button.sec.on { background:var(--acc-soft); color:var(--acc-ink); border-color:var(--acc); }
+  button.sm, .btn.sm { min-height:36px; padding:0 12px; font-size:13.5px; border-radius:10px; }
+  button.danger { background:transparent; color:var(--err); border:1px solid color-mix(in srgb, var(--err) 55%, transparent); }
+  button.link { background:none; color:var(--acc-ink); padding:0 6px; min-height:36px; }
+  label { display:block; font-size:12.5px; color:var(--mut); margin:10px 0 4px; font-weight:550; }
+  input[type=text], input[type=number], select { width:100%; min-height:44px; padding:0 12px; font:inherit; font-size:16px; border:1px solid var(--ln); border-radius:12px; background:var(--surf2); color:var(--ink); }
+  input[type=checkbox] { width:20px; height:20px; accent-color:var(--acc); margin:0; flex:none; }
+  select { appearance:auto; }
   .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-  .grow { flex:1; }
-  table { width:100%; border-collapse:collapse; font-size:14px; }
-  td, th { padding:3px; text-align:left; }
-  th { font-size:11px; color:var(--mut); font-weight:600; }
-  td input { padding:6px; font-size:14px; }
-  .tot { display:flex; justify-content:space-between; font-weight:700; padding:8px 4px; }
-  .ok { color:var(--acc); } .bad { color:var(--err); }
-  .thumbs { display:grid; grid-template-columns:repeat(auto-fill,minmax(96px,1fr)); gap:8px; margin-top:8px; }
-  .th { border:1px solid var(--ln); border-radius:8px; overflow:hidden; background:var(--bg); }
-  .th img { width:100%; height:110px; object-fit:contain; display:block; background:#fff; }
-  .th .bar { display:flex; justify-content:space-between; padding:2px; }
-  .th .bar button { padding:3px 6px; font-size:13px; }
-  #camera { position:fixed; inset:0; background:#000; z-index:20; display:flex; flex-direction:column; }
-  #camera[hidden] { display:none; }
-  #camV { flex:1; min-height:0; width:100%; object-fit:contain; background:#000; }
-  #camBar { display:flex; align-items:center; justify-content:space-between; padding:14px 18px calc(14px + env(safe-area-inset-bottom)); background:#000; }
-  #camShot { width:74px; height:74px; border-radius:50%; border:5px solid #fff; background:#e8e8e8; padding:0; }
-  #camShot:active { background:#9a9a9a; }
-  #camCount { min-width:64px; text-align:center; color:#fff; font-weight:700; font-size:18px; }
+  .grow { flex:1; min-width:0; }
+  .grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; }
+  .pill { display:inline-flex; align-items:center; gap:4px; font-size:12px; font-weight:600; padding:3px 9px; border-radius:99px; background:var(--surf2); border:1px solid var(--ln); color:var(--mut); white-space:nowrap; }
+  .pill.ok { background:var(--ok-soft); color:var(--ok); border-color:transparent; }
+  .pill.bad { background:var(--err-soft); color:var(--err); border-color:transparent; }
+  .pill.warn { background:var(--warn-soft); color:var(--acc-ink); border-color:transparent; }
+  .ok { color:var(--ok); } .bad { color:var(--err); }
+  .card { background:var(--surf); border-radius:18px; padding:14px; margin:0 0 12px; box-shadow:var(--shadow); }
+  h2 { font-size:13px; margin:0 0 8px; font-weight:700; color:var(--mut); text-transform:none; letter-spacing:.01em; }
+  .tot { display:flex; justify-content:space-between; font-weight:750; padding:10px 2px 2px; font-variant-numeric:tabular-nums; }
+  .ctl { display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin:6px 0; font-size:13px; }
+  .ctl input[type=number] { width:76px; min-height:36px; }
+  .ctl select { width:auto; min-height:36px; }
+
+  /* ---------- Resumen de la semana ---------- */
+  .weekbar { display:flex; align-items:center; justify-content:space-between; gap:12px; background:var(--surf); border-radius:18px; padding:14px 16px; box-shadow:var(--shadow); margin:6px 0 18px; }
+  .weekbar .k { font-size:13px; color:var(--mut); }
+  .weekbar .k b { display:block; color:var(--ink); font-size:15px; margin-bottom:1px; }
+  .weekbar .v { font-size:24px; font-weight:800; letter-spacing:-.02em; font-variant-numeric:tabular-nums; }
+  .sec-head { display:flex; align-items:center; justify-content:space-between; margin:6px 2px 8px; }
+  .sec-head h2 { margin:0; }
+
+  /* ---------- Lista de días ---------- */
+  .day { background:var(--surf); border-radius:18px; margin:0 0 10px; box-shadow:var(--shadow); overflow:hidden; }
+  .day-head { width:100%; background:none; color:var(--ink); border-radius:0; padding:12px 14px; min-height:76px; display:flex; align-items:center; gap:12px; text-align:left; font-weight:inherit; }
+  .day-thumb { width:46px; height:60px; border-radius:6px; background:var(--surf2); border:1px solid var(--ln); overflow:hidden; display:grid; place-items:center; flex:none; color:var(--mut); }
+  .day-thumb img { width:100%; height:100%; object-fit:cover; object-position:top; display:block; }
+  .day-main { flex:1; min-width:0; display:flex; flex-direction:column; gap:3px; }
+  .day-title { font-size:16.5px; font-weight:700; letter-spacing:-.01em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .day-sub { font-size:13px; color:var(--mut); font-weight:500; }
+  .day-side { display:flex; flex-direction:column; align-items:flex-end; gap:5px; }
+  .day-total { font-size:16px; font-weight:750; font-variant-numeric:tabular-nums; }
+  .chev { color:var(--mut); transition:transform .25s var(--ease); }
+  .day.open .chev { transform:rotate(180deg); }
+  .day-body { padding:2px 14px 14px; border-top:1px solid var(--ln); }
+  .day-body h3 { margin:16px 0 6px; font-size:13px; color:var(--mut); font-weight:700; }
+  .actions { display:flex; gap:8px; flex-wrap:wrap; margin:12px 0 4px; }
+  .actions .primary { flex:1 1 100%; min-height:48px; font-size:16px; }
+  .actions .ghost { flex:1; }
+  .note { display:flex; gap:10px; align-items:flex-start; padding:10px 12px; border-radius:12px; font-size:13.5px; margin:10px 0 0; background:var(--surf2); }
+  .note.warn { background:var(--warn-soft); }
+  .note.bad { background:var(--err-soft); color:var(--err); }
+  .note .ic { margin-top:1px; }
+  .linkdel { margin-top:14px; width:100%; }
+
+  table { width:100%; border-collapse:separate; border-spacing:0 6px; font-size:15px; }
+  th { font-size:11.5px; color:var(--mut); font-weight:650; text-align:left; padding:0 4px; }
+  td { padding:0 3px 0 0; }
+  td:last-child { padding:0; width:38px; }
+  td input { min-height:42px; padding:0 8px; font-size:15px; }
+  td select { min-height:42px; padding:0 2px; font-size:13px; }
+  td input.num { text-align:right; font-variant-numeric:tabular-nums; }
+  td .del { min-height:42px; width:36px; padding:0; border-radius:10px; }
+
+  .thumbs { display:grid; grid-template-columns:repeat(auto-fill,minmax(92px,1fr)); gap:8px; }
+  .th { position:relative; padding:0; min-height:0; border-radius:10px; background:var(--surf2); border:1px solid var(--ln); overflow:hidden; aspect-ratio:3/4; display:block; }
+  .th img { width:100%; height:100%; object-fit:cover; object-position:top; display:block; background:#fff; }
+  .th .badge { position:absolute; left:5px; bottom:5px; font-size:10.5px; font-weight:700; padding:2px 7px; border-radius:99px; background:rgba(20,20,24,.78); color:#fff; }
+  .th .num { position:absolute; right:5px; top:5px; font-size:11px; font-weight:700; min-width:22px; height:22px; border-radius:11px; display:grid; place-items:center; background:rgba(255,255,255,.92); color:#1c1c1e; }
+  .th[data-type=settle] .badge { background:#b45309; }
+  .th[data-type=invoice] .badge { background:#1d6fb8; }
+  .th[data-type=pod] .badge { background:#1f7a45; }
+  #queue { display:flex; gap:8px; overflow-x:auto; padding:2px 0 8px; scroll-snap-type:x proximity; }
+  #queue .th { width:62px; flex:none; scroll-snap-align:start; }
+  #queue .del { position:absolute; right:3px; top:3px; width:24px; min-height:24px; height:24px; padding:0; border-radius:12px; background:rgba(20,20,24,.78); color:#fff; border:0; }
+
+  /* ---------- Vacío ---------- */
+  .empty { text-align:center; padding:36px 24px 24px; color:var(--mut); }
+  .empty svg.art { width:150px; height:150px; margin-bottom:10px; }
+  .empty h3 { margin:0 0 6px; color:var(--ink); font-size:19px; letter-spacing:-.01em; }
+  .empty p { margin:0 auto; max-width:30ch; font-size:14.5px; }
+
+  /* ---------- Archivos ---------- */
+  .files .f { display:flex; align-items:center; gap:10px; padding:10px 0; border-top:1px solid var(--ln); }
+  .files .f:first-of-type { border-top:0; }
+  .files .f-ic { width:38px; height:38px; border-radius:10px; background:var(--acc-soft); color:var(--acc-ink); display:grid; place-items:center; flex:none; }
+  .files .f-main { flex:1; min-width:0; }
+  .files .f-name { font-size:14.5px; font-weight:650; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .files .f-meta { font-size:12.5px; color:var(--mut); }
+  .files .iconbtn { box-shadow:none; background:var(--surf2); width:40px; height:40px; }
+
+  /* ---------- Dock inferior ---------- */
+  #dock { position:fixed; left:0; right:0; bottom:0; z-index:8; background:color-mix(in srgb, var(--surf) 92%, transparent); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); border-top:1px solid var(--ln); padding:8px 16px calc(8px + env(safe-area-inset-bottom)); }
+  .dock-in { max-width:520px; margin:0 auto; display:grid; grid-template-columns:1fr 84px 1fr; align-items:end; }
+  .dk { background:none; color:var(--ink); flex-direction:column; gap:3px; min-height:56px; font-size:12px; font-weight:650; border-radius:14px; padding:0 6px; cursor:pointer; }
+  .dk .ic { width:24px; height:24px; }
+  .dk.fin { color:var(--acc-ink); }
+  .shutter { width:68px; height:68px; border-radius:50%; margin:-26px auto 0; padding:0; background:var(--acc); color:var(--on-acc); border:5px solid var(--surf); box-shadow:0 6px 18px color-mix(in srgb, var(--acc) 45%, transparent), 0 2px 4px rgba(0,0,0,.2); }
+  .shutter .ic { width:30px; height:30px; stroke-width:1.9; }
+  #toast { position:fixed; left:50%; bottom:calc(var(--dock) + 14px + env(safe-area-inset-bottom)); transform:translate(-50%, 8px); z-index:9; max-width:min(92vw,520px); background:#1c1c1e; color:#fff; font-size:13.5px; padding:10px 16px; border-radius:14px; box-shadow:0 8px 28px rgba(0,0,0,.28); opacity:0; pointer-events:none; transition:opacity .25s var(--ease), transform .25s var(--ease); }
+  #toast.show { opacity:1; transform:translate(-50%, 0); }
+  body.has-tray #toast { bottom:calc(var(--dock) + 150px + env(safe-area-inset-bottom)); }
+  #msg { display:block; }
+
+  /* bandeja de fotos en cola */
+  #qbar { position:fixed; left:12px; right:12px; bottom:calc(var(--dock) + 8px + env(safe-area-inset-bottom)); z-index:7; max-width:616px; margin:0 auto; background:var(--surf); border-radius:20px; box-shadow:var(--shadow), 0 0 0 1px var(--ln); padding:12px 12px 12px; }
+  #qbar .qtop { display:flex; align-items:center; gap:8px; margin-top:2px; }
+  #qcount { font-size:14px; font-weight:700; }
+  #prog { position:fixed; left:0; right:0; bottom:calc(var(--dock) + env(safe-area-inset-bottom)); z-index:6; text-align:center; font-size:12.5px; color:var(--mut); pointer-events:none; }
+
+  /* ---------- Hojas (sheets) ---------- */
+  .sheet { position:fixed; inset:0; z-index:15; background:var(--bg); display:flex; flex-direction:column; animation:rise .32s var(--ease); }
+  @keyframes rise { from { transform:translateY(24px); opacity:0; } to { transform:none; opacity:1; } }
+  .sheet-bar { display:flex; align-items:center; gap:10px; padding:calc(10px + env(safe-area-inset-top)) 14px 10px; }
+  .sheet-bar h2 { flex:1; margin:0; font-size:17px; color:var(--ink); font-weight:750; text-align:center; }
+  .sheet-bar .iconbtn { box-shadow:none; background:var(--surf); }
+  .sheet-body { flex:1; overflow:auto; padding:4px 16px 40px; max-width:640px; width:100%; margin:0 auto; }
+  .group { background:var(--surf); border-radius:18px; padding:14px; margin:0 0 14px; box-shadow:var(--shadow); }
+  .group > h3 { margin:0 0 4px; font-size:15px; font-weight:750; }
+  .group .hint { margin:2px 0 8px; color:var(--mut); font-size:13px; }
+  .check { display:flex; gap:10px; align-items:flex-start; color:var(--ink); font-size:14px; margin:12px 0 0; }
+
+  /* hoja de página (como los editores de escáner) */
+  #pageSheet { background:#0b0b0c; color:#fff; z-index:16; }
+  #pageSheet .sheet-bar .iconbtn { background:rgba(255,255,255,.12); color:#fff; }
+  #pageSheet .sheet-bar h2 { color:#fff; }
+  .ps-stage { flex:1; min-height:0; display:grid; place-items:center; padding:6px 14px; }
+  .ps-stage img { max-width:100%; max-height:100%; object-fit:contain; background:#fff; border-radius:4px; box-shadow:0 10px 40px rgba(0,0,0,.5); }
+  .ps-panel { background:var(--surf); color:var(--ink); border-radius:24px 24px 0 0; padding:14px 14px calc(14px + env(safe-area-inset-bottom)); }
+  .seg { display:flex; background:var(--surf2); border-radius:12px; padding:3px; gap:3px; border:1px solid var(--ln); }
+  .seg button { flex:1; min-height:36px; background:none; color:var(--mut); font-size:13px; border-radius:9px; padding:0 6px; }
+  .seg button.on { background:var(--surf); color:var(--ink); box-shadow:0 1px 3px rgba(0,0,0,.18); }
+  .seg-l { font-size:12px; color:var(--mut); font-weight:650; margin:12px 2px 6px; }
+  .tools { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-top:12px; }
+  .tool { flex-direction:column; gap:5px; min-height:62px; background:var(--surf2); color:var(--ink); font-size:12px; font-weight:600; border-radius:14px; padding:6px 2px; border:1px solid var(--ln); }
+  .tool .ic { width:24px; height:24px; }
+  .tool.dng { color:var(--err); }
+  #psImg.loading { opacity:.5; }
+
+  /* ---------- Cámara ---------- */
+  #camera { position:fixed; inset:0; background:#000; z-index:20; display:flex; flex-direction:column; color:#fff; }
+  #camTop { display:flex; align-items:center; justify-content:space-between; padding:calc(10px + env(safe-area-inset-top)) 14px 10px; }
+  #camTop .iconbtn { background:rgba(255,255,255,.14); color:#fff; box-shadow:none; }
+  .camchip { font-size:13px; font-weight:700; padding:7px 14px; border-radius:99px; background:rgba(255,255,255,.14); }
+  #camStage { position:relative; flex:1; min-height:0; }
+  #camV { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; background:#000; }
+  .guide { position:absolute; inset:7% 8% 5%; pointer-events:none; }
+  .guide i { position:absolute; width:34px; height:34px; border:3px solid var(--acc); }
+  .guide i:nth-child(1) { left:0; top:0; border-right:0; border-bottom:0; border-top-left-radius:12px; }
+  .guide i:nth-child(2) { right:0; top:0; border-left:0; border-bottom:0; border-top-right-radius:12px; }
+  .guide i:nth-child(3) { left:0; bottom:0; border-right:0; border-top:0; border-bottom-left-radius:12px; }
+  .guide i:nth-child(4) { right:0; bottom:0; border-left:0; border-top:0; border-bottom-right-radius:12px; }
+  #camBar { display:grid; grid-template-columns:1fr auto 1fr; align-items:center; padding:16px 22px calc(16px + env(safe-area-inset-bottom)); background:#000; }
+  #camThumb { width:54px; height:54px; border-radius:12px; border:2px solid rgba(255,255,255,.5); background:#222 center/cover no-repeat; position:relative; }
+  #camCount { position:absolute; right:-8px; top:-8px; min-width:24px; height:24px; border-radius:12px; background:var(--acc); color:var(--on-acc); font-size:13px; font-weight:800; display:grid; place-items:center; padding:0 6px; }
+  #camShot { width:78px; height:78px; border-radius:50%; border:5px solid #fff; background:transparent; padding:0; position:relative; }
+  #camShot::after { content:""; position:absolute; inset:4px; border-radius:50%; background:#fff; transition:transform .12s var(--ease); }
+  #camShot:active::after { transform:scale(.88); }
+  #camDone { justify-self:end; }
   #camFlash { position:absolute; inset:0; background:#fff; opacity:0; pointer-events:none; transition:opacity .25s; }
-  #editor { position:fixed; inset:0; background:rgba(0,0,0,.85); z-index:10; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; }
-  #editor[hidden] { display:none; }
-  #status { position:fixed; left:0; right:0; bottom:0; background:var(--card); border-top:1px solid var(--ln); padding:10px 14px; display:flex; gap:10px; align-items:center; }
-  #msg { flex:1; font-size:13px; color:var(--mut); }
-  details summary { cursor:pointer; font-weight:600; }
-  .pill { font-size:12px; padding:2px 8px; border-radius:99px; background:var(--bg); border:1px solid var(--ln); color:var(--mut); }
-  #lay { position:fixed; inset:0; background:rgba(0,0,0,.88); z-index:12; overflow:auto; padding:10px; }
-  #lay .box { max-width:900px; margin:0 auto; background:var(--card); border-radius:12px; padding:12px; }
-  #lay canvas { max-width:100%; border:1px solid var(--ln); display:block; margin:8px auto; background:#fff; }
-  .ctl { display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin:4px 0; font-size:13px; }
-  .ctl input[type=number] { width:70px; padding:5px; font-size:14px; }
-  select { padding:8px; font-size:15px; border:1px solid var(--ln); border-radius:8px; background:var(--bg); color:var(--ink); }
+
+  /* ---------- Recorte ---------- */
+  #editor { position:fixed; inset:0; background:#0b0b0c; z-index:18; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; color:#fff; padding:0 12px calc(12px + env(safe-area-inset-bottom)); }
+  #editor .row { width:100%; max-width:520px; }
+  #editor .row button { flex:1; }
+  #editor button.sec { background:rgba(255,255,255,.12); color:#fff; border-color:transparent; }
+  #editor button.danger { color:#ff9d8f; border-color:rgba(255,157,143,.5); }
+
+  /* ---------- Planillas (editor de posiciones) ---------- */
+  #lay { position:fixed; inset:0; background:var(--bg); z-index:17; overflow:auto; padding:calc(10px + env(safe-area-inset-top)) 12px 24px; }
+  #lay .box { max-width:900px; margin:0 auto; background:var(--surf); border-radius:18px; padding:14px; box-shadow:var(--shadow); }
+  #lay canvas { max-width:100%; border:1px solid var(--ln); display:block; margin:10px auto; background:#fff; border-radius:6px; }
+  #lay h2 { color:var(--ink); font-size:17px; }
+  @media (min-width:700px) { .day-head { padding:14px 18px; } }
+  @media (prefers-reduced-motion: reduce) { * { animation:none !important; transition:none !important; } }
 </style>
 </head>
 <body>
-<header>Ruta DSD · armar semana</header>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-camera" viewBox="0 0 24 24"><path d="M4 8h3l1.5-2h7L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.6"/></symbol>
+    <symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2.5"/><circle cx="9" cy="10" r="1.6"/><path d="M21 16l-5-5-9 9"/></symbol>
+    <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 7h9M19 7h1M4 17h1M11 17h9"/><circle cx="16" cy="7" r="2.5"/><circle cx="8" cy="17" r="2.5"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+    <symbol id="i-chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+    <symbol id="i-crop" viewBox="0 0 24 24"><path d="M7 3v14h14M3 7h14v14"/></symbol>
+    <symbol id="i-rot" viewBox="0 0 24 24"><path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1"/><path d="M3.5 3.8v4.4h4.4"/></symbol>
+    <symbol id="i-scan" viewBox="0 0 24 24"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3"/><path d="M8 12h8"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></symbol>
+    <symbol id="i-doc" viewBox="0 0 24 24"><path d="M7 3h7l5 5v12a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-left" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></symbol>
+    <symbol id="i-right" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></symbol>
+    <symbol id="i-sort" viewBox="0 0 24 24"><path d="M4 7h9M4 12h6M4 17h3M17 6v12M14 15l3 3 3-3"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 4l9 16H3z"/><path d="M12 10v4M12 17.4v.1"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8v.1"/></symbol>
+    <symbol id="i-tag" viewBox="0 0 24 24"><path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1.2"/></symbol>
+    <symbol id="i-stack" viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/></symbol>
+    <symbol id="i-sparkle" viewBox="0 0 24 24"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 17v4M17 19h4"/></symbol>
+  </defs>
+</svg>
+
+<header class="appbar"><div class="appbar-in">
+  <div class="brand"><h1>Ruta DSD</h1><p id="hdrSub">Armar semana</p></div>
+  <button class="iconbtn" id="cfgBtn" aria-label="Ajustes"><svg class="ic"><use href="#i-sliders"/></svg></button>
+</div></header>
+
 <main>
-  <details class="card" id="cfgCard">
-    <summary>Ajustes · ruta, planillas y semana</summary>
-    <h2>Ruta / perfil</h2>
-    <div class="row"><select id="profSel" class="grow"></select><button class="sec sm" id="profNew">+ Nueva ruta</button><button class="danger sm" id="profDel">Borrar</button></div>
-    <label>Nombre del perfil</label><input type="text" id="profName">
-    <div class="grid">
-      <div><label>Semana (WK#)</label><input type="text" id="week" inputmode="numeric"></div>
-      <div><label>Ruta</label><input type="text" id="route"></div>
-      <div><label>Compañía (IBP)</label><input type="text" id="ibp"></div>
-    </div>
-    <h2 style="margin-top:14px">Planillas de esta ruta</h2>
-    <p style="margin:2px 0 6px;color:var(--mut);font-size:12px">Cada ruta usa planillas distintas y a veces solo una. Sube la planilla EN BLANCO (foto o escaneo, recta): la app encuentra sola dónde escribir. Si apagas una, no se incluye en el PDF.</p>
-    <div id="tplBox"></div>
-    <label><input type="checkbox" id="fullInv"> Invoice completo en todas las filas (si no, solo últimos 4 dígitos desde la fila 2)</label>
-    <label style="display:flex;gap:8px;align-items:flex-start;color:var(--ink);font-size:14px;margin-top:10px"><input type="checkbox" id="autoCrop" style="margin-top:3px"><span>Recortar y enderezar el documento (como Genius Scan). Si lo apagas se guarda la foto completa. Con el botón ✂ de cada foto ajustas las esquinas a mano.</span></label>
-    <h2 style="margin-top:14px">Lector de la PC (gratis y local)</h2>
-    <p id="pcState" style="margin:4px 0;font-size:13px;color:var(--mut)">Buscando…</p>
-    <label>Dirección de la PC (solo para la app de Android; ejemplo http://192.168.0.100:8765)</label>
-    <input type="text" id="ocrServer" inputmode="url" placeholder="http://192.168.0.100:8765" autocomplete="off">
-    <p style="margin:6px 0;color:var(--mut);font-size:12px">Lee las fotos en tu PC con PaddleOCR, sin internet y sin costo. Abre la app desde la PC (run.bat) o escribe su dirección. Las fotos no salen de tu red.</p>
-    <div class="row" style="margin-top:10px"><button class="danger sm" id="resetBtn">Borrar todo y empezar semana nueva</button></div>
-  </details>
+  <section class="weekbar" id="weekBar" hidden></section>
+
+  <div class="empty" id="empty" hidden>
+    <svg class="art" viewBox="0 0 160 160" aria-hidden="true">
+      <circle cx="80" cy="82" r="64" fill="var(--acc-soft)"/>
+      <rect x="44" y="26" width="64" height="84" rx="7" fill="var(--surf)" stroke="var(--acc)" stroke-width="2.5"/>
+      <path d="M56 46h40M56 58h40M56 70h26" stroke="var(--acc)" stroke-width="3" stroke-linecap="round"/>
+      <rect x="66" y="64" width="62" height="74" rx="7" fill="var(--surf)" stroke="var(--ink)" stroke-width="2.5" opacity=".92"/>
+      <path d="M78 84h38M78 96h38M78 108h22" stroke="var(--mut)" stroke-width="3" stroke-linecap="round"/>
+      <circle cx="116" cy="118" r="15" fill="var(--acc)"/>
+      <path d="M116 111v14M109 118h14" stroke="var(--on-acc)" stroke-width="3" stroke-linecap="round"/>
+    </svg>
+    <h3>Todavía no hay documentos</h3>
+    <p>Toca el botón naranja para escanear las páginas del día, o sube las fotos de la galería.</p>
+  </div>
 
   <div id="days"></div>
-  <div class="card" id="archive" hidden></div>
-
-  <div class="card">
-    <h2>Escanear / importar fotos</h2>
-    <p style="margin:0 0 8px;color:var(--mut);font-size:14px">Sube las fotos del día; se ordenan por la hora en que las tomaste. Empieza con el settlement (el de $0 con el cash, o el reporte con toda la info); la app lo detecta y abre el día. Mete también la foto del <b>Settlement Report</b>: de ahí salen los datos de la hoja. Al terminar toca <b>Procesar todo</b>.</p>
-    <div class="row">
-      <button id="scanBtn" hidden>📷 Escanear documentos</button>
-      <label class="btn sec" for="photoIn">🖼 Subir fotos de la galería</label>
-      <input type="file" id="photoIn" accept="image/*" multiple hidden>
-      <button class="sec" id="camBtn">📸 Cámara de la app</button>
-      <input type="file" id="camIn" accept="image/*" capture="environment" hidden>
-      <button class="sec" id="manualDay">Día manual</button>
-    </div>
-    <p style="margin:6px 0 0;color:var(--mut);font-size:13px">Recomendado: toma las fotos con la cámara normal del teléfono, y luego súbelas todas juntas aquí. Se ordenan por la hora en que las tomaste.</p>
-    <div id="queue" class="thumbs"></div>
-    <div class="row" id="qbar" style="margin-top:8px" hidden>
-      <span id="qcount" class="grow"></span>
-      <button class="danger sm" id="qclear">Vaciar</button>
-      <button id="qgo">Procesar todo</button>
-    </div>
-    <div id="prog" style="margin-top:8px;font-size:13px;color:var(--mut)"></div>
-  </div>
+  <div class="sec-head" id="daysFoot" hidden><h2>&nbsp;</h2><button class="sec sm" id="manualDay"><svg class="ic sm"><use href="#i-plus"/></svg>Día manual</button></div>
+  <div class="card files" id="archive" hidden></div>
 </main>
 
-<div id="camera" hidden>
-  <video id="camV" playsinline muted autoplay></video>
-  <div id="camBar">
-    <button class="danger" id="camClose">Cerrar</button>
-    <button id="camShot" aria-label="Tomar foto"></button>
-    <span id="camCount">0</span>
+<div id="prog"></div>
+<div id="toast" role="status" aria-live="polite"><span id="msg">Listo.</span></div>
+
+<div id="qbar" hidden>
+  <div id="queue"></div>
+  <div class="qtop">
+    <span id="qcount" class="grow"></span>
+    <button class="danger sm" id="qclear">Vaciar</button>
+    <button id="qgo"><svg class="ic sm"><use href="#i-sparkle"/></svg>Procesar todo</button>
   </div>
-  <div id="camFlash"></div>
 </div>
+
+<nav id="dock" aria-label="Acciones principales"><div class="dock-in">
+  <label class="dk btn" for="photoIn" style="margin:0"><svg class="ic"><use href="#i-image"/></svg>Galería</label>
+  <div>
+    <button class="shutter" id="camBtn" aria-label="Escanear con la cámara"><svg class="ic"><use href="#i-camera"/></svg></button>
+    <button class="shutter" id="scanBtn" aria-label="Escanear documentos" hidden><svg class="ic"><use href="#i-camera"/></svg></button>
+  </div>
+  <button class="dk fin" id="genBtn"><svg class="ic"><use href="#i-stack"/></svg>Finalizar semana</button>
+</div></nav>
+<input type="file" id="photoIn" accept="image/*" multiple hidden>
+<input type="file" id="camIn" accept="image/*" capture="environment" hidden>
+
+<!-- Ajustes -->
+<div class="sheet" id="cfgSheet" hidden>
+  <div class="sheet-bar"><span style="width:44px"></span><h2>Ajustes</h2><button class="iconbtn" id="cfgClose" aria-label="Cerrar"><svg class="ic"><use href="#i-check"/></svg></button></div>
+  <div class="sheet-body">
+    <div class="group">
+      <h3>Ruta y semana</h3>
+      <div class="row" style="margin-top:8px"><select id="profSel" class="grow" aria-label="Ruta"></select><button class="sec sm" id="profNew"><svg class="ic sm"><use href="#i-plus"/></svg>Nueva</button><button class="danger sm" id="profDel">Borrar</button></div>
+      <label for="profName">Nombre del perfil</label><input type="text" id="profName">
+      <div class="grid">
+        <div><label for="week">Semana (WK#)</label><input type="text" id="week" inputmode="numeric"></div>
+        <div><label for="route">Ruta</label><input type="text" id="route"></div>
+        <div><label for="ibp">Compañía</label><input type="text" id="ibp"></div>
+      </div>
+    </div>
+    <div class="group">
+      <h3>Planillas de esta ruta</h3>
+      <p class="hint">Sube la planilla en blanco (foto o escaneo, recta) y la app encuentra sola dónde escribir. Si apagas una, no se incluye en el PDF.</p>
+      <div id="tplBox"></div>
+      <label class="check"><input type="checkbox" id="fullInv"><span>Invoice completo en todas las filas (si no, solo los últimos 4 dígitos desde la fila 2)</span></label>
+    </div>
+    <div class="group">
+      <h3>Escaneo</h3>
+      <label class="check"><input type="checkbox" id="autoCrop"><span>Recortar y enderezar el documento. Si lo apagas se guarda la foto completa. En cada página puedes ajustar las esquinas con Recortar.</span></label>
+    </div>
+    <div class="group">
+      <h3>Lector de la PC</h3>
+      <p id="pcState" class="hint">Buscando…</p>
+      <label for="ocrServer">Dirección de la PC (solo app de Android)</label>
+      <input type="text" id="ocrServer" inputmode="url" placeholder="http://192.168.0.100:8765" autocomplete="off">
+      <p class="hint" style="margin-top:8px">Lee las fotos en tu PC con PaddleOCR, sin internet y sin costo. Abre la app desde la PC (run.bat) o escribe su dirección. Las fotos no salen de tu red.</p>
+    </div>
+    <div class="group">
+      <h3>Zona delicada</h3>
+      <p class="hint">Borra los días, las fotos y los PDF de días de la pantalla. Las semanas finalizadas no se tocan.</p>
+      <button class="danger" id="resetBtn"><svg class="ic sm"><use href="#i-trash"/></svg>Borrar todo y empezar semana nueva</button>
+    </div>
+  </div>
+</div>
+
+<!-- Página: herramientas -->
+<div class="sheet" id="pageSheet" hidden>
+  <div class="sheet-bar"><button class="iconbtn" id="psClose" aria-label="Cerrar"><svg class="ic"><use href="#i-close"/></svg></button><h2 id="psTitle"></h2><span style="width:44px"></span></div>
+  <div class="ps-stage"><img id="psImg" alt="Página escaneada"></div>
+  <div class="ps-panel" id="psPanel">
+    <div class="seg-l" style="margin-top:0">Tipo de página</div>
+    <div class="seg" id="psType">
+      <button data-t="settle">Settlement</button><button data-t="invoice">Invoice</button><button data-t="pod">POD</button><button data-t="other">Otro</button>
+    </div>
+    <div class="seg-l">Filtro</div>
+    <div class="seg" id="psFilter">
+      <button data-f="bw">B/N limpio</button><button data-f="gray">Gris</button><button data-f="color">Color</button>
+    </div>
+    <div class="tools">
+      <button class="tool" data-p="crop"><svg class="ic"><use href="#i-crop"/></svg>Recortar</button>
+      <button class="tool" data-p="rotl"><svg class="ic"><use href="#i-rot"/></svg>Izquierda</button>
+      <button class="tool" data-p="rotr"><svg class="ic flip"><use href="#i-rot"/></svg>Derecha</button>
+      <button class="tool" data-p="reread"><svg class="ic"><use href="#i-scan"/></svg>Releer</button>
+      <button class="tool" data-p="left"><svg class="ic"><use href="#i-left"/></svg>Atrás</button>
+      <button class="tool" data-p="right"><svg class="ic"><use href="#i-right"/></svg>Adelante</button>
+      <button class="tool dng" data-p="del"><svg class="ic"><use href="#i-trash"/></svg>Eliminar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Cámara continua -->
+<div id="camera" hidden>
+  <div id="camTop">
+    <button class="iconbtn" id="camClose" aria-label="Cerrar cámara"><svg class="ic"><use href="#i-close"/></svg></button>
+    <span class="camchip">Encuadra la hoja completa</span>
+    <span style="width:44px"></span>
+  </div>
+  <div id="camStage">
+    <video id="camV" playsinline muted autoplay></video>
+    <div class="guide"><i></i><i></i><i></i><i></i></div>
+    <div id="camFlash"></div>
+  </div>
+  <div id="camBar">
+    <div id="camThumb" aria-hidden="true"><span id="camCount">0</span></div>
+    <button id="camShot" aria-label="Tomar foto"></button>
+    <button id="camDone" class="sm">Listo</button>
+  </div>
+</div>
+
+<!-- Recorte -->
 <div id="editor" hidden>
   <canvas id="edc" style="touch-action:none;max-width:100%"></canvas>
-  <div class="row"><button class="sec" id="edFull">Sin recorte</button><button class="danger" id="edCancel">Cancelar</button><button id="edOk">Aplicar</button></div>
+  <div class="row"><button class="sec" id="edFull">Hoja completa</button><button class="danger" id="edCancel">Cancelar</button><button id="edOk">Aplicar</button></div>
 </div>
+
+<!-- Planilla: vista previa -->
 <div id="lay" hidden><div class="box">
   <h2 id="layTitle"></h2>
   <div id="layNotes" style="font-size:13px;color:var(--err)"></div>
   <canvas id="layCv"></canvas>
   <div class="ctl">Editar: <select id="layGrp"></select>
-    <button class="sec sm" data-n="dx" data-v="-1">◀</button><button class="sec sm" data-n="dx" data-v="1">▶</button><button class="sec sm" data-n="dy" data-v="-1">▲</button><button class="sec sm" data-n="dy" data-v="1">▼</button>
+    <button class="sec sm" data-n="dx" data-v="-1" aria-label="Izquierda"><svg class="ic sm"><use href="#i-left"/></svg></button><button class="sec sm" data-n="dx" data-v="1" aria-label="Derecha"><svg class="ic sm"><use href="#i-right"/></svg></button><button class="sec sm" data-n="dy" data-v="-1" aria-label="Arriba"><svg class="ic sm" style="transform:rotate(90deg)"><use href="#i-left"/></svg></button><button class="sec sm" data-n="dy" data-v="1" aria-label="Abajo"><svg class="ic sm" style="transform:rotate(-90deg)"><use href="#i-left"/></svg></button>
     Letra <button class="sec sm" data-n="k" data-v="-0.05">A−</button><button class="sec sm" data-n="k" data-v="0.05">A+</button> <span id="layAdj" class="pill"></span></div>
   <div class="ctl" id="layDate" hidden>Fecha: <select id="layDateMode"><option value="text">Texto único 10/03/26</option><option value="parts">3 casillas: 10 · 03 · 26</option></select>
     Separación <button class="sec sm" data-n="sp" data-v="-2">−</button><button class="sec sm" data-n="sp" data-v="2">+</button></div>
   <div class="ctl" id="layRows"></div>
   <div class="ctl" id="layCols"></div>
-  <div class="row" style="margin-top:8px"><button class="danger" id="layCancel">Cancelar</button><button class="sec" id="layReset">Reiniciar ajuste</button><button id="laySave">Guardar</button></div>
+  <div class="row" style="margin-top:10px"><button class="danger" id="layCancel">Cancelar</button><button class="sec" id="layReset">Reiniciar ajuste</button><button id="laySave">Guardar</button></div>
 </div></div>
-<div id="status">
-  <div id="msg">Listo.</div>
-  <button id="genBtn">Finalizar semana</button>
-</div>
 
 <script src="lib/pdf-lib.min.js"></script>
 <script src="lib/tesseract.min.js"></script>
@@ -152,9 +418,9 @@
 <script src="reportparse.js?v=35"></script>
 <script src="parser.js?v=35"></script>
 <script src="ocrsmart.js?v=35"></script>
-<script src="docscan.js?v=35"></script>
+<script src="docscan.js?v=36"></script>
 <script src="layout.js?v=39"></script>
 <script src="pdfgen.js?v=41"></script>
-<script src="app.js?v=42"></script>
+<script src="app.js?v=43"></script>
 </body>
 </html>
