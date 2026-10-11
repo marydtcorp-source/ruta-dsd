@@ -1,5 +1,5 @@
 // Service worker: la app funciona sin internet una vez abierta (PWA para iPhone/iPad/Android desde el navegador).
-const V = 'rutadsd-v43';
+const V = 'rutadsd-v44';
 const CORE = ['./', 'index.html', 'app.js', 'parser.js', 'reportparse.js', 'ocrsmart.js', 'pcocr.js', 'pdfgen.js', 'docscan.js', 'layout.js', 'manifest.webmanifest',
   'icon-192.png', 'icon-512.png', 'apple-touch-icon.png', 'templates/cover.jpeg', 'templates/sheet.jpeg',
   'lib/pdf-lib.min.js', 'lib/tesseract.min.js', 'lib/worker.min.js', 'lib/eng.traineddata.gz',

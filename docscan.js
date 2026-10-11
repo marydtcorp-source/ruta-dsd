@@ -160,11 +160,16 @@
   // el papel queda blanco parejo y el texto negro, sin las manchas de las sombras.
   async function cleanScan(canvas) {
     const cv = await loadCV();
-    const src = cv.imread(canvas), gray = new cv.Mat(), bg = new cv.Mat(), out = new cv.Mat();
+    const src = cv.imread(canvas), gray = new cv.Mat(), bg = new cv.Mat(), out = new cv.Mat(), small = new cv.Mat();
     cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
-    const k = Math.max(15, Math.round(Math.max(canvas.width, canvas.height) / 30)) | 1;
-    cv.morphologyEx(gray, bg, cv.MORPH_CLOSE, cv.getStructuringElement(cv.MORPH_ELLIPSE, new cv.Size(k, k)));
-    cv.GaussianBlur(bg, bg, new cv.Size(k | 1, k | 1), 0);
+    // El fondo (papel con sombras) es suave: se estima en una copia pequeña (máx. 500 px) y se amplía.
+    // Igual resultado que a tamaño completo, mucho más rápido en el teléfono.
+    const f = Math.min(1, 500 / Math.max(canvas.width, canvas.height));
+    cv.resize(gray, small, new cv.Size(Math.max(8, Math.round(canvas.width * f)), Math.max(8, Math.round(canvas.height * f))), 0, 0, cv.INTER_AREA);
+    const k = Math.max(7, Math.round(Math.max(small.cols, small.rows) / 30)) | 1;
+    cv.morphologyEx(small, small, cv.MORPH_CLOSE, cv.getStructuringElement(cv.MORPH_ELLIPSE, new cv.Size(k, k)));
+    cv.GaussianBlur(small, small, new cv.Size(k, k), 0);
+    cv.resize(small, bg, new cv.Size(canvas.width, canvas.height), 0, 0, cv.INTER_LINEAR);
     cv.divide(gray, bg, out, 255);
     // un poco más de contraste: lo casi blanco pasa a blanco
     const lut = new cv.Mat(1, 256, cv.CV_8U);
@@ -172,7 +177,7 @@
     cv.LUT(out, lut, out);
     const rgba = new cv.Mat(); cv.cvtColor(out, rgba, cv.COLOR_GRAY2RGBA);
     const res = document.createElement('canvas'); res.width = canvas.width; res.height = canvas.height; cv.imshow(res, rgba);
-    src.delete(); gray.delete(); bg.delete(); out.delete(); lut.delete(); rgba.delete();
+    src.delete(); gray.delete(); bg.delete(); out.delete(); small.delete(); lut.delete(); rgba.delete();
     return res;
   }
 
