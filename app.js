@@ -228,6 +228,8 @@
   // ---------- Modelo de días ----------
   const newDay = (date = '') => ({ id: uid(), date, settleNo: '', cash: {}, rows: [], total: null, hasReport: false, reportThumb: '', pages: [] });
   // Si el usuario corrige filas, el total del día (y de la hoja del PDF) pasa a ser la suma de las filas
+  // Credit = monto negativo; Charge/Cash = positivo. El teclado numérico del teléfono no trae el signo menos: la columna lo decide
+  const fixSign = (r) => { if (r.amount == null || isNaN(r.amount)) return; if (r.col === 6) r.amount = -Math.abs(r.amount); else if (r.col === 4 || r.col === 5) r.amount = Math.abs(r.amount); };
   const recalcTotal = (d) => { d.total = Math.round(sumDay(d) * 100) / 100; d.totalDerived = true; d.reportOk = true; };
   const sumDay = (d) => d.rows.reduce((s, r) => s + (Number(r.amount) || 0), 0);
   const money = (n) => Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -625,8 +627,10 @@
         save();
       });
       el.addEventListener('change', (e) => {
-        if (e.target.dataset.k === 'col') d.rows[+e.target.dataset.r].col = +e.target.value;
-        if (['amount', 'invoice'].includes(e.target.dataset.k) || e.target.dataset.f === 'date') { if (e.target.dataset.f === 'date') mergeSameDate(); if (e.target.dataset.k === 'amount') recalcTotal(d); analyze(d); render(); }
+        const k = e.target.dataset.k, r = k ? d.rows[+e.target.dataset.r] : null;
+        if (k === 'col') { r.col = +e.target.value; fixSign(r); recalcTotal(d); analyze(d); render(); save(); return; }
+        if (k === 'amount') fixSign(r);
+        if (['amount', 'invoice'].includes(k) || e.target.dataset.f === 'date') { if (e.target.dataset.f === 'date') mergeSameDate(); if (k === 'amount') recalcTotal(d); analyze(d); render(); }
         save();
       });
       el.addEventListener('click', (e) => {
@@ -875,7 +879,7 @@
     }
     layWork.fa = layWork.fa || {};
     const G = kind === 'cover' ? [['all', 'Todo junto'], ['week', 'Semana'], ['route', 'Ruta'], ['ibp', 'Compañía'], ['dates', 'Fechas de los días'], ['totals', 'Total de cada día'], ['totweek', 'Total semana']]
-      : [['all', 'Todo junto'], ['week', 'Semana'], ['route', 'Ruta'], ['ibp', 'Compañía'], ['date', 'Fecha'], ['rows', 'Invoices'], ['amounts', 'Montos'], ['totals', 'Totales de columnas'], ['totalSales', 'Total Sales']];
+      : [['all', 'Todo junto'], ['week', 'Semana'], ['route', 'Ruta'], ['ibp', 'Compañía'], ['date', 'Fecha'], ['rows', 'Invoices'], ['amounts', 'Montos'], ['totals', 'Totales de columnas'], ['totalSales', 'Total Sales'], ['invCount', 'Nº de invoices']];
     $('layGrp').innerHTML = G.map(([v, n]) => `<option value="${v}">${n}</option>`).join('');
     $('layDateMode').value = layWork.dateMode || (layWork.dateParts ? 'parts' : 'text');
     $('lay').hidden = false; drawLay();

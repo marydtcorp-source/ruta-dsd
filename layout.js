@@ -147,7 +147,44 @@
   }
 
   // ---------- Armado del layout ----------
-  const field = (px, k) => px && { x: +(px.x * k).toFixed(2), y: +(px.y * k).toFixed(2), s: +clamp(px.s * k, 6, 14).toFixed(1), maxW: +(px.maxW * k).toFixed(1) };
+  const field = (px, k) => px && Object.assign({ x: +(px.x * k).toFixed(2), y: +(px.y * k).toFixed(2), s: +clamp(px.s * k, 6, 14).toFixed(1), maxW: +(px.maxW * k).toFixed(1) }, px.align ? { align: px.align } : {});
+  // Raya (línea horizontal de tinta) para escribir encima: la más cercana a yRef dentro de la ventana, a la derecha de xMin.
+  // Devuelve { xa, xb, y } o null. Escribir centrado sobre la raya evita que el texto caiga corrido.
+  // ¿La línea termina en una esquina de caja (hay un lado vertical pegado a su extremo)? Una raya suelta no lo tiene
+  function boxEdge(ink, W, H, xa, xb, y) {
+    const vert = (x) => { let up = 0, dn = 0; for (let d = 6; d <= 26; d++) { if (y - d >= 0 && ink[(y - d) * W + x]) up++; if (y + d < H && ink[(y + d) * W + x]) dn++; } return up >= 15 || dn >= 15; };
+    for (let d = -9; d <= 3; d++) if (xa + d >= 0 && vert(xa + d)) return true;
+    for (let d = -3; d <= 9; d++) if (xb + d < W && vert(xb + d)) return true;
+    return false;
+  }
+  // Rayas sueltas de una banda de la página (encabezado), de arriba abajo; cada grupo = una fila de rayas, de izquierda a derecha
+  function headerLines(ink, W, H, yEnd, minLen, tol) {
+    const found = [];
+    for (let y = 2; y < yEnd; y++) {
+      let start = -1, last = -1, gap = 0;
+      const flush = () => { if (start >= 0 && last - start + 1 >= minLen && !boxEdge(ink, W, H, start, last, y)) found.push({ xa: start, xb: last, y }); start = -1; };
+      for (let x = 0; x < W; x++) { if (ink[y * W + x]) { if (start < 0) start = x; last = x; gap = 0; } else if (start >= 0 && ++gap > 3) flush(); }
+      flush();
+    }
+    const cl = []; // junta las filas de píxeles de una misma raya (grosor)
+    found.sort((a, b) => a.y - b.y || a.xa - b.xa).forEach((r) => { const c = cl.find((q) => Math.abs(q.y - r.y) <= 3 && Math.abs(q.xa - r.xa) < 0.02 * W && Math.abs(q.xb - r.xb) < 0.02 * W); if (c) { c.y = (c.y + r.y) / 2; } else cl.push({ ...r }); });
+    const groups = [];
+    cl.sort((a, b) => a.y - b.y).forEach((r) => { const g = groups.find((q) => Math.abs(q.y - r.y) < tol); if (g) g.items.push(r); else groups.push({ y: r.y, items: [r] }); });
+    return groups.map((g) => g.items.sort((a, b) => a.xa - b.xa));
+  }
+  function underline(ink, W, H, xMin, xMax, yRef, up, down, minLen) {
+    let best = null;
+    for (let y = Math.max(0, Math.round(yRef - up)); y <= Math.min(H - 1, Math.round(yRef + down)); y++) {
+      let start = -1, last = -1, gap = 0;
+      const flush = () => { if (start >= 0 && last - start + 1 >= minLen && !boxEdge(ink, W, H, start, last, y)) { const c = { xa: start, xb: last, y, d: Math.abs(y - yRef), len: last - start + 1 }; if (!best || c.d < best.d - 1 || (Math.abs(c.d - best.d) <= 1 && c.len > best.len)) best = c; } start = -1; };
+      for (let x = Math.max(0, Math.round(xMin)); x < Math.min(W, Math.round(xMax)); x++) {
+        const on = ink[y * W + x] | ink[Math.min(H - 1, y + 1) * W + x];
+        if (on) { if (start < 0) start = x; last = x; gap = 0; } else if (start >= 0 && ++gap > 3) flush();
+      }
+      flush();
+    }
+    return best;
+  }
   function labelField(ws, w, tx1) { // sitio de escritura a la derecha de una etiqueta; null si ya trae algo escrito
     const nx = nextOnLine(ws, w);
     if (nx && nx.x0 - w.x1 < 2.5 * w.h) return null; // ya hay texto pegado a la etiqueta
@@ -206,14 +243,49 @@
       if (wk) L.fields.week = field(labelField(ws, wk, T.tx1), k); else L.notes.push('No encontré "WK:" en la hoja diaria.');
       if (rt) { const ibp = ws.find((o) => o.t === 'IBP' && Math.abs(o.cy - rt.cy) < rt.h && o.x0 >= rt.x1 - 3); const f = labelField(ws, ibp || rt, T.tx1); if (f) L.fields.route = field(f, k); }
       if (nm) { const f = labelField(ws, nm, T.tx1); if (f) L.fields.ibp = field(f, k); }
-      if (dt && /[_/]/.test(dt.t)) { // "DATE__/__/__" leído como una sola palabra: tres casillas MM / DD / YY a la derecha
+      if (dt && /\//.test(dt.t)) { // "DATE__/__/__" leído como una sola palabra: tres casillas MM / DD / YY a la derecha
         const x0 = dt.x0 + (dt.x1 - dt.x0) * 0.36, x1 = T.tx1 - 0.02 * W, th = (x1 - x0) / 3;
         L.dateParts = [0, 1, 2].map((i) => ({ x: +((x0 + i * th + 0.12 * th) * k).toFixed(2), y: +((dt.y1 - 0.18 * dt.h) * k).toFixed(2) })); L.dateSize = +clamp(dt.h * k * 0.9, 7, 14).toFixed(1);
         L.notes.push('La fecha se escribió en 3 casillas: confirma en la vista previa que caigan sobre las rayas.');
-      } else if (dt) { const f = labelField(ws, dt, T.tx1); if (f) L.fields.date = field(f, k); else L.notes.push('La fecha de la hoja ya trae algo escrito o no la pude ubicar.'); } else L.notes.push('No encontré "DATE" en la hoja diaria: la fecha no se escribirá.');
+      } else if (dt) {
+        // una sola raya: la fecha va centrada sobre la raya (si no se ve la raya, a la derecha de la etiqueta)
+        const ul = underline(ink, W, H, dt.x0, W, dt.y1, 0.3 * dt.h, 1.0 * dt.h, Math.max(30, 0.06 * W));
+        if (ul) L.fields.date = field({ x: (ul.xa + ul.xb) / 2, y: ul.y - 0.25 * dt.h, s: dt.h * 0.9, maxW: (ul.xb - ul.xa) * 0.92, align: 'center' }, k);
+        else { const f = labelField(ws, dt, T.tx1); if (f) L.fields.date = field(f, k); else L.notes.push('La fecha de la hoja ya trae algo escrito o no la pude ubicar.'); }
+      } else L.notes.push('No encontré "DATE" en la hoja diaria: la fecha no se escribirá.');
+      if (!L.fields.date || !L.fields.week) { // el OCR no leyó la etiqueta: se usan las rayas de arriba (fecha) y de la fila de Driver / ID / WK#
+        const hl = headerLines(ink, W, H, Math.round(T.header ? T.header.a : T.body.y0 - 2 * pitch) - 4, Math.max(30, 0.05 * W), 0.6 * pitch);
+        const sz = pitch * 0.5, put = (r) => ({ x: (r.xa + r.xb) / 2, y: r.y - 0.28 * sz * 1.5, s: sz, maxW: (r.xb - r.xa) * 0.92, align: 'center' });
+        if (!L.fields.date && !L.dateParts && hl.length && hl[0].length === 1 && hl[0][0].xa > 0.45 * W) { L.fields.date = field(put(hl[0][0]), k); L.notes.push('Fecha ubicada por la raya (el lector no vio la etiqueta): confirma en la vista previa.'); }
+        const row = hl.length > 1 ? hl[hl.length - 1] : null;
+        if (!L.fields.week && row && row.length === 3) { L.fields.week = field(put(row[2]), k); L.notes.push('Semana (WK#) ubicada por la raya: confirma en la vista previa.'); }
+        L.notes = L.notes.filter((n) => !((L.fields.date && /"DATE"/.test(n)) || (L.fields.week && /"WK:"/.test(n))));
+      }
       const ts = findW(ws, /^SALES\W*$/, (w) => w.cy > T.body.y1)[0];
-      if (ts) { const dol = ws.find((o) => /^\$/.test(o.t) && Math.abs(o.cy - ts.cy) < ts.h && o.x0 >= ts.x1 - 3 && o.x0 - ts.x1 < 3 * ts.h); const base = dol || ts; L.fields.totalSales = field({ x: base.x1 + 0.5 * ts.h, y: ts.y1 - 0.18 * ts.h, s: ts.h * 0.9, maxW: 160 }, k); }
+      if (ts) {
+        const dol = ws.find((o) => /^[$§S]$/.test(o.t) && Math.abs(o.cy - ts.cy) < ts.h && o.x0 >= ts.x1 - 3 && o.x0 - ts.x1 < 3 * ts.h), base = dol || ts;
+        const ul = underline(ink, W, H, base.x1, W, ts.y1, 0.3 * ts.h, 1.6 * ts.h, Math.max(30, 0.05 * W));
+        L.fields.totalSales = ul
+          ? field({ x: ul.xa + 0.5 * ts.h, y: ul.y - 0.25 * ts.h, s: Math.max(ts.h * 0.9, pitch * 0.5), maxW: (ul.xb - ul.xa) * 0.92 }, k)
+          : field({ x: base.x1 + 0.5 * ts.h, y: ts.y1 - 0.18 * ts.h, s: ts.h * 0.9, maxW: 160 }, k);
+      }
       else L.notes.push('No encontré "Total Sales $" en la hoja: no se escribirá (puedes dejarlo a mano).');
+      // NO. OF INVOICES (abajo, al centro): el número de invoices del día va centrado sobre su raya
+      let ni = findW(ws, /INVOICES\W*$/, (w) => w.cy > T.body.y1 + 0.5 * pitch)[0];
+      if (!ni) { // el OCR de la página completa se salta las cajas pequeñas: se lee solo la franja de abajo
+        try {
+          const y0 = Math.round(T.body.y1 + pitch), c = document.createElement('canvas'); c.width = W; c.height = H - y0;
+          c.getContext('2d').drawImage(canvas, 0, y0, W, H - y0, 0, 0, W, H - y0);
+          const w2 = prep(await ocrWords(c)).map((w) => ({ ...w, y0: w.y0 + y0, y1: w.y1 + y0, cy: w.cy + y0 }));
+          ni = findW(w2, /INVOICES\W*$/)[0];
+        } catch (e) { /* se queda sin número de invoices */ }
+      }
+      if (ni) {
+        const ul = underline(ink, W, H, ni.x0 - 0.02 * W, ni.x1 + 0.1 * W, ni.y1 + 0.3 * ni.h, 0, 4 * ni.h, Math.max(24, 0.04 * W));
+        L.fields.invCount = ul && ul.y > ni.y1
+          ? field({ x: (ul.xa + ul.xb) / 2, y: ul.y - 0.25 * ni.h, s: Math.max(ni.h, pitch * 0.5), maxW: (ul.xb - ul.xa) * 0.9, align: 'center' }, k)
+          : field({ x: (ni.x0 + ni.x1) / 2, y: ni.y1 + 2.2 * ni.h, s: Math.max(ni.h, pitch * 0.5), maxW: (ni.x1 - ni.x0), align: 'center' }, k);
+      }
     }
     return { layout: L, canvas };
   }

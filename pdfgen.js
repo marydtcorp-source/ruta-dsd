@@ -6,8 +6,8 @@
   const fmt = (n) => '$' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const num2 = (n) => Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const shortDate = (d) => { // MM/DD/YYYY -> MM/DD/YY
-    const m = (d || '').match(/^(\d\d)\/(\d\d)\/(\d{4})$/);
-    return m ? m[1] + '/' + m[2] + '/' + m[3].slice(2) : d || '';
+    const m = (d || '').trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/);
+    return m ? m[1].padStart(2, '0') + '/' + m[2].padStart(2, '0') + '/' + m[3].slice(-2) : d || '';
   };
   const dayTotal = (day) => (day.total != null ? Number(day.total) : day.rows.reduce((s, r) => s + (Number(r.amount) || 0), 0));
 
@@ -137,7 +137,7 @@
     return { text: (s, x, y, o) => t.text(s, x + a.dx + b.dx, y + a.dy + b.dy, Object.assign({}, o, { size: o.size * k, maxW: o.maxW && o.maxW * k })) };
   }
   function drawFields(t0, L, cfg, names) {
-    names.forEach((n) => { const f = L.fields && L.fields[n], v = cfg[n]; if (f && v) withAdj(t0, L, n).text(String(v), f.x, f.y, { size: f.s, maxW: f.maxW }); });
+    names.forEach((n) => { const f = L.fields && L.fields[n], v = cfg[n]; if (f && v) withAdj(t0, L, n).text(String(v), f.x, f.y, { size: f.s, maxW: f.maxW, align: f.align }); });
   }
   function coverRowY(L, i) { return L.rowYs ? L.rowYs[i] : L.rows.y0 + (i + 1) * ((L.rows.y1 - L.rows.y0) / L.rows.n) - 0.28 * ((L.rows.y1 - L.rows.y0) / L.rows.n); }
   function drawCoverL(t0, L, cfg, days) {
@@ -158,12 +158,12 @@
     const xs = L.xs, c = L.cols, pitch = (L.rows.y1 - L.rows.y0) / L.rows.n, pad = Math.min(6, pitch * 0.3);
     const ti = withAdj(t0, L, 'rows'), ta = withAdj(t0, L, 'amounts'), tt = withAdj(t0, L, 'totals'), td = withAdj(t0, L, 'date'), ts = withAdj(t0, L, 'totalSales');
     drawFields(t0, L, cfg, ['week', 'route', 'ibp']);
-    const m = (day.date || '').match(/^(\d\d)\/(\d\d)\/(\d{4})$/);
+    const m = (day.date || '').trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/);
     if (m) {
-      const sp = L.dateSpread, vals = [m[1], m[2], m[3].slice(2)], fd = L.fields.date;
+      const sp = L.dateSpread, vals = [m[1].padStart(2, '0'), m[2].padStart(2, '0'), m[3].slice(-2)], fd = L.fields.date;
       if (L.dateParts) vals.forEach((v, i) => td.text(v, L.dateParts[i].x + i * (sp || 0), L.dateParts[i].y, { size: L.dateSize || L.size }));
       else if (fd && L.dateMode === 'parts') vals.forEach((v, i) => td.text(v, fd.x + i * (sp != null ? sp : 40), fd.y, { size: fd.s }));
-      else if (fd) td.text(vals.join('/'), fd.x, fd.y, { size: fd.s, maxW: fd.maxW });
+      else if (fd) td.text(vals.join('/'), fd.x, fd.y, { size: fd.s, maxW: fd.maxW, align: fd.align });
     }
     const colMap = { 4: c.cash, 5: c.charge, 6: c.credit }, colTot = {};
     let tot = 0;
@@ -178,14 +178,16 @@
     });
     Object.keys(colTot).forEach((ci) => tt.text(num2(colTot[ci]), xs[+ci + 1] - pad, L.totY, { size: L.size, bold: true, align: 'right', maxW: xs[+ci + 1] - xs[+ci] - 2 * pad }));
     const f = L.fields.totalSales;
-    if (!day.more && f) ts.text(num2(day.total != null ? day.total : tot), f.x, f.y, { size: f.s, bold: true, maxW: f.maxW });
+    if (!day.more && f) ts.text(num2(day.total != null ? day.total : tot), f.x, f.y, { size: f.s, bold: true, maxW: f.maxW, align: f.align });
+    const fc = L.fields.invCount;
+    if (!day.more && fc && day.rows.length) withAdj(t0, L, 'invCount').text(String(day.rows.length), fc.x, fc.y, { size: fc.s, bold: true, maxW: fc.maxW, align: fc.align });
   }
   const pdfTarget = (page, fonts, H) => ({
     text(s, x, y, o) {
       const f = o.bold ? fonts.bold : fonts.reg; let size = o.size;
       if (o.maxW) { const w0 = f.widthOfTextAtSize(s, size); if (w0 > o.maxW) size *= o.maxW / w0; }
       const w = f.widthOfTextAtSize(s, size);
-      page.drawText(s, { x: o.align === 'right' ? x - w : x, y: H - y, size, font: f });
+      page.drawText(s, { x: o.align === 'right' ? x - w : o.align === 'center' ? x - w / 2 : x, y: H - y, size, font: f });
     },
   });
   // Vista previa en un canvas (px = pt * scale)
@@ -195,7 +197,7 @@
         let size = o.size; const font = (sz) => (o.bold ? 'bold ' : '') + sz * scale + 'px Helvetica, Arial, sans-serif';
         g.font = font(size);
         if (o.maxW) { const w0 = g.measureText(s).width / scale; if (w0 > o.maxW) { size *= o.maxW / w0; g.font = font(size); } }
-        g.fillStyle = '#0a2fd0'; g.textAlign = o.align === 'right' ? 'right' : 'left'; g.fillText(s, x * scale, y * scale);
+        g.fillStyle = '#0a2fd0'; g.textAlign = o.align === 'right' ? 'right' : o.align === 'center' ? 'center' : 'left'; g.fillText(s, x * scale, y * scale);
       },
     };
   }
