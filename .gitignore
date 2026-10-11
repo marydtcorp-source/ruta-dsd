@@ -1,0 +1,19 @@
+node_modules/
+output/
+android/build/
+android/app/build/
+android/.gradle/
+android/local.properties
+android/capacitor-cordova-android-plugins/
+__pycache__/
+*.pyc
+# Fotos y pruebas con datos reales de clientes: NUNCA subir a GitHub
+samples/
+test/
+sample_report.png
+templates/blank.pdf
+.env
+*.p12
+*.p8
+*.mobileprovision
+www/

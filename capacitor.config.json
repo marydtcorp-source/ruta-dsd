@@ -1,0 +1,6 @@
+{
+  "appId": "com.rivmar.rutadsd",
+  "appName": "Ruta DSD",
+  "webDir": "www",
+  "android": { "allowMixedContent": false }
+}

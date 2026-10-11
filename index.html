@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ruta DSD</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="theme-color" content="#0b6b4f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Ruta DSD">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<style>
+  :root { --bg:#f4f5f7; --card:#fff; --ink:#1b1f24; --mut:#667085; --acc:#0b6b4f; --err:#b42318; --ln:#d9dde3; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#14171a; --card:#1d2227; --ink:#eceff3; --mut:#9aa4b0; --acc:#3ccf9c; --err:#ff8a80; --ln:#323a42; } }
+  [hidden] { display:none !important; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; padding-bottom:90px; }
+  header { padding:14px 16px; font-weight:700; font-size:18px; }
+  main { max-width:760px; margin:0 auto; padding:0 12px; }
+  .card { background:var(--card); border:1px solid var(--ln); border-radius:12px; padding:12px; margin:0 0 12px; }
+  h2 { font-size:15px; margin:0 0 8px; }
+  label { display:block; font-size:12px; color:var(--mut); margin:6px 0 2px; }
+  input[type=text], input[type=number] { width:100%; padding:9px; font-size:16px; border:1px solid var(--ln); border-radius:8px; background:var(--bg); color:var(--ink); }
+  .grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; }
+  button, .btn { appearance:none; border:0; border-radius:10px; padding:11px 14px; font-size:15px; font-weight:600; background:var(--acc); color:#fff; cursor:pointer; display:inline-block; text-align:center; }
+  button.sec, .btn.sec { background:transparent; color:var(--acc); border:1px solid var(--acc); }
+  button.sm { padding:6px 9px; font-size:13px; }
+  button.danger { background:transparent; color:var(--err); border:1px solid var(--err); }
+  .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .grow { flex:1; }
+  table { width:100%; border-collapse:collapse; font-size:14px; }
+  td, th { padding:3px; text-align:left; }
+  th { font-size:11px; color:var(--mut); font-weight:600; }
+  td input { padding:6px; font-size:14px; }
+  .tot { display:flex; justify-content:space-between; font-weight:700; padding:8px 4px; }
+  .ok { color:var(--acc); } .bad { color:var(--err); }
+  .thumbs { display:grid; grid-template-columns:repeat(auto-fill,minmax(96px,1fr)); gap:8px; margin-top:8px; }
+  .th { border:1px solid var(--ln); border-radius:8px; overflow:hidden; background:var(--bg); }
+  .th img { width:100%; height:110px; object-fit:contain; display:block; background:#fff; }
+  .th .bar { display:flex; justify-content:space-between; padding:2px; }
+  .th .bar button { padding:3px 6px; font-size:13px; }
+  #camera { position:fixed; inset:0; background:#000; z-index:20; display:flex; flex-direction:column; }
+  #camera[hidden] { display:none; }
+  #camV { flex:1; min-height:0; width:100%; object-fit:contain; background:#000; }
+  #camBar { display:flex; align-items:center; justify-content:space-between; padding:14px 18px calc(14px + env(safe-area-inset-bottom)); background:#000; }
+  #camShot { width:74px; height:74px; border-radius:50%; border:5px solid #fff; background:#e8e8e8; padding:0; }
+  #camShot:active { background:#9a9a9a; }
+  #camCount { min-width:64px; text-align:center; color:#fff; font-weight:700; font-size:18px; }
+  #camFlash { position:absolute; inset:0; background:#fff; opacity:0; pointer-events:none; transition:opacity .25s; }
+  #editor { position:fixed; inset:0; background:rgba(0,0,0,.85); z-index:10; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; }
+  #editor[hidden] { display:none; }
+  #status { position:fixed; left:0; right:0; bottom:0; background:var(--card); border-top:1px solid var(--ln); padding:10px 14px; display:flex; gap:10px; align-items:center; }
+  #msg { flex:1; font-size:13px; color:var(--mut); }
+  details summary { cursor:pointer; font-weight:600; }
+  .pill { font-size:12px; padding:2px 8px; border-radius:99px; background:var(--bg); border:1px solid var(--ln); color:var(--mut); }
+  #lay { position:fixed; inset:0; background:rgba(0,0,0,.88); z-index:12; overflow:auto; padding:10px; }
+  #lay .box { max-width:900px; margin:0 auto; background:var(--card); border-radius:12px; padding:12px; }
+  #lay canvas { max-width:100%; border:1px solid var(--ln); display:block; margin:8px auto; background:#fff; }
+  .ctl { display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin:4px 0; font-size:13px; }
+  .ctl input[type=number] { width:70px; padding:5px; font-size:14px; }
+  select { padding:8px; font-size:15px; border:1px solid var(--ln); border-radius:8px; background:var(--bg); color:var(--ink); }
+</style>
+</head>
+<body>
+<header>Ruta DSD · armar semana</header>
+<main>
+  <details class="card" id="cfgCard">
+    <summary>Ajustes · ruta, planillas y semana</summary>
+    <h2>Ruta / perfil</h2>
+    <div class="row"><select id="profSel" class="grow"></select><button class="sec sm" id="profNew">+ Nueva ruta</button><button class="danger sm" id="profDel">Borrar</button></div>
+    <label>Nombre del perfil</label><input type="text" id="profName">
+    <div class="grid">
+      <div><label>Semana (WK#)</label><input type="text" id="week" inputmode="numeric"></div>
+      <div><label>Ruta</label><input type="text" id="route"></div>
+      <div><label>Compañía (IBP)</label><input type="text" id="ibp"></div>
+    </div>
+    <h2 style="margin-top:14px">Planillas de esta ruta</h2>
+    <p style="margin:2px 0 6px;color:var(--mut);font-size:12px">Cada ruta usa planillas distintas y a veces solo una. Sube la planilla EN BLANCO (foto o escaneo, recta): la app encuentra sola dónde escribir. Si apagas una, no se incluye en el PDF.</p>
+    <div id="tplBox"></div>
+    <label><input type="checkbox" id="fullInv"> Invoice completo en todas las filas (si no, solo últimos 4 dígitos desde la fila 2)</label>
+    <label style="display:flex;gap:8px;align-items:flex-start;color:var(--ink);font-size:14px;margin-top:10px"><input type="checkbox" id="autoCrop" style="margin-top:3px"><span>Recortar y enderezar el documento (como Genius Scan). Si lo apagas se guarda la foto completa. Con el botón ✂ de cada foto ajustas las esquinas a mano.</span></label>
+    <h2 style="margin-top:14px">Lector de la PC (gratis y local)</h2>
+    <p id="pcState" style="margin:4px 0;font-size:13px;color:var(--mut)">Buscando…</p>
+    <label>Dirección de la PC (solo para la app de Android; ejemplo http://192.168.0.100:8765)</label>
+    <input type="text" id="ocrServer" inputmode="url" placeholder="http://192.168.0.100:8765" autocomplete="off">
+    <p style="margin:6px 0;color:var(--mut);font-size:12px">Lee las fotos en tu PC con PaddleOCR, sin internet y sin costo. Abre la app desde la PC (run.bat) o escribe su dirección. Las fotos no salen de tu red.</p>
+    <div class="row" style="margin-top:10px"><button class="danger sm" id="resetBtn">Borrar todo y empezar semana nueva</button></div>
+  </details>
+
+  <div id="days"></div>
+  <div class="card" id="archive" hidden></div>
+
+  <div class="card">
+    <h2>Escanear / importar fotos</h2>
+    <p style="margin:0 0 8px;color:var(--mut);font-size:14px">Sube las fotos del día; se ordenan por la hora en que las tomaste. Empieza con el settlement (el de $0 con el cash, o el reporte con toda la info); la app lo detecta y abre el día. Mete también la foto del <b>Settlement Report</b>: de ahí salen los datos de la hoja. Al terminar toca <b>Procesar todo</b>.</p>
+    <div class="row">
+      <button id="scanBtn" hidden>📷 Escanear documentos</button>
+      <label class="btn sec" for="photoIn">🖼 Subir fotos de la galería</label>
+      <input type="file" id="photoIn" accept="image/*" multiple hidden>
+      <button class="sec" id="camBtn">📸 Cámara de la app</button>
+      <input type="file" id="camIn" accept="image/*" capture="environment" hidden>
+      <button class="sec" id="manualDay">Día manual</button>
+    </div>
+    <p style="margin:6px 0 0;color:var(--mut);font-size:13px">Recomendado: toma las fotos con la cámara normal del teléfono, y luego súbelas todas juntas aquí. Se ordenan por la hora en que las tomaste.</p>
+    <div id="queue" class="thumbs"></div>
+    <div class="row" id="qbar" style="margin-top:8px" hidden>
+      <span id="qcount" class="grow"></span>
+      <button class="danger sm" id="qclear">Vaciar</button>
+      <button id="qgo">Procesar todo</button>
+    </div>
+    <div id="prog" style="margin-top:8px;font-size:13px;color:var(--mut)"></div>
+  </div>
+</main>
+
+<div id="camera" hidden>
+  <video id="camV" playsinline muted autoplay></video>
+  <div id="camBar">
+    <button class="danger" id="camClose">Cerrar</button>
+    <button id="camShot" aria-label="Tomar foto"></button>
+    <span id="camCount">0</span>
+  </div>
+  <div id="camFlash"></div>
+</div>
+<div id="editor" hidden>
+  <canvas id="edc" style="touch-action:none;max-width:100%"></canvas>
+  <div class="row"><button class="sec" id="edFull">Sin recorte</button><button class="danger" id="edCancel">Cancelar</button><button id="edOk">Aplicar</button></div>
+</div>
+<div id="lay" hidden><div class="box">
+  <h2 id="layTitle"></h2>
+  <div id="layNotes" style="font-size:13px;color:var(--err)"></div>
+  <canvas id="layCv"></canvas>
+  <div class="ctl">Editar: <select id="layGrp"></select>
+    <button class="sec sm" data-n="dx" data-v="-1">◀</button><button class="sec sm" data-n="dx" data-v="1">▶</button><button class="sec sm" data-n="dy" data-v="-1">▲</button><button class="sec sm" data-n="dy" data-v="1">▼</button>
+    Letra <button class="sec sm" data-n="k" data-v="-0.05">A−</button><button class="sec sm" data-n="k" data-v="0.05">A+</button> <span id="layAdj" class="pill"></span></div>
+  <div class="ctl" id="layDate" hidden>Fecha: <select id="layDateMode"><option value="text">Texto único 10/03/26</option><option value="parts">3 casillas: 10 · 03 · 26</option></select>
+    Separación <button class="sec sm" data-n="sp" data-v="-2">−</button><button class="sec sm" data-n="sp" data-v="2">+</button></div>
+  <div class="ctl" id="layRows"></div>
+  <div class="ctl" id="layCols"></div>
+  <div class="row" style="margin-top:8px"><button class="danger" id="layCancel">Cancelar</button><button class="sec" id="layReset">Reiniciar ajuste</button><button id="laySave">Guardar</button></div>
+</div></div>
+<div id="status">
+  <div id="msg">Listo.</div>
+  <button id="genBtn">Finalizar semana</button>
+</div>
+
+<script src="lib/pdf-lib.min.js"></script>
+<script src="lib/tesseract.min.js"></script>
+<script src="pcocr.js?v=35"></script>
+<script src="reportparse.js?v=35"></script>
+<script src="parser.js?v=35"></script>
+<script src="ocrsmart.js?v=35"></script>
+<script src="docscan.js?v=35"></script>
+<script src="layout.js?v=39"></script>
+<script src="pdfgen.js?v=41"></script>
+<script src="app.js?v=42"></script>
+</body>
+</html>

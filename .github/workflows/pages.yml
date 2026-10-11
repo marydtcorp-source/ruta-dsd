@@ -1,0 +1,28 @@
+name: Web (GitHub Pages)
+
+# Publica la versión web instalable (PWA) para probar en iPhone sin cuenta Apple Developer.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.dep.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node build-web.js
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: www
+      - id: dep
+        uses: actions/deploy-pages@v4
