@@ -160,6 +160,14 @@
     }
     return { out: res, quadN, srcUrl };
   }
+  // Las primeras fotos de cada lote (reporte, settlement) traen todos los datos: solo esas se leen con OCR.
+  const OCR_FIRST = 3;
+  // El resto de las fotos del día solo se limpian para el PDF, sin OCR
+  async function lightPhoto(file) {
+    const color = await fileToCanvas(file, 2600);
+    const mk = await makeOut(file, color);
+    return { canvas: mk.out, text: '', conf: 0, type: 'other', rot: 0, srcUrl: mk.srcUrl, quadN: mk.quadN, light: true };
+  }
   const pcStats = { n: 0, err: 0 };
   async function readPhoto(file, w) {
     const color = await fileToCanvas(file, 2600);          // original en color: para leer
@@ -264,10 +272,19 @@
   }
   const hamming = (a, b) => { let n = 0; for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) n++; return n; };
   const fileKey = (f) => (f.lastModified && f.size && !/^(scan|cam)-/.test(f.name) ? f.name + '|' + f.size + '|' + f.lastModified : null);
-  function isDuplicate(fp) {
+  // Dos hojas distintas con el mismo formato (otro día, otra factura) se parecen en la huella: además
+  // deben compartir los números largos leídos (invoice, fecha, montos) para contar como repetidas.
+  const sigOfText = (t) => new Set(String(t || '').match(/\d{4,}/g) || []);
+  function sameText(a, b) {
+    if (!a.size || !b.size) return true;                    // sin números legibles: manda la huella
+    let n = 0; a.forEach((x) => { if (b.has(x)) n++; });
+    return n / Math.min(a.size, b.size) >= 0.7;
+  }
+  function isDuplicate(fp, text) {
+    const sg = sigOfText(text);
     for (const d of state.days) {
-      if (d.reportFp && hamming(d.reportFp, fp) <= 6) return true;
-      for (const p of d.pages) if (p.fp && hamming(p.fp, fp) <= 6) return true;
+      if (d.reportFp && hamming(d.reportFp, fp) <= 6 && sameText(sg, new Set(d.reportSig || []))) return true;
+      for (const p of d.pages) if (p.fp && hamming(p.fp, fp) <= 6 && sameText(sg, sigOfText(p.text))) return true;
     }
     return false;
   }
@@ -281,12 +298,12 @@
       if (!d.date) return true;
       const a = seen[d.date];
       if (!a) { seen[d.date] = d; return true; }
-      if (d.hasReport && (!a.hasReport || d.rows.length > a.rows.length)) { a.rows = d.rows; a.total = d.total; a.hasReport = true; a.reportThumb = d.reportThumb; a.reportFp = d.reportFp; }
+      if (d.hasReport && (!a.hasReport || d.rows.length > a.rows.length)) { a.rows = d.rows; a.total = d.total; a.hasReport = true; a.reportThumb = d.reportThumb; a.reportFp = d.reportFp; a.reportSig = d.reportSig; }
       if (!a.settleNo) a.settleNo = d.settleNo;
       if (!(a.cash && a.cash.cashSales != null)) a.cash = d.cash;
       d.pages.forEach((p) => {
         if (p.type === 'settle' && a.pages.some((q) => q.type === 'settle')) return;
-        if (p.fp && a.pages.some((q) => q.fp && hamming(q.fp, p.fp) <= 6)) return;
+        if (p.fp && a.pages.some((q) => q.fp && hamming(q.fp, p.fp) <= 6 && sameText(sigOfText(q.text), sigOfText(p.text)))) return;
         a.pages.push(p);
       });
       return false;
@@ -338,7 +355,7 @@
       const pool = usePc ? Array.from({ length: lanes }, () => null) : await getWorkers(lanes);
       const todo = files.map((f) => ({ f, key: fileKey(f), skip: false, p: null, res: null }));
       todo.forEach((t) => { if (t.key && state.seen.includes(t.key)) t.skip = true; });
-      let nextRead = 0, consumed = 0;
+      let nextRead = 0, consumed = 0, batchCur = null;
       const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
       const lane = async (w) => {
         for (;;) {
@@ -347,7 +364,7 @@
           while (i - consumed > lanes + 1) await sleep(60);           // no se adelanta demasiado (memoria)
           const t = todo[i];
           if (t.skip) { t.res = Promise.resolve(null); continue; }
-          t.res = readPhoto(t.f, w).catch((e) => { console.error(e); return { error: e }; });
+          t.res = (i < OCR_FIRST ? readPhoto(t.f, w) : lightPhoto(t.f)).catch((e) => { console.error(e); return { error: e }; });
           await t.res;
         }
       };
@@ -363,7 +380,14 @@
         if (!r || r.error) { skipped++; continue; }
         const big = r.canvas, fp = fingerprint(big);
         if (key) state.seen.push(key);
-        if (isDuplicate(fp)) { skipped++; continue; }
+        if (r.light) {
+          let target = batchCur || state.days[state.days.length - 1];
+          if (!target) { target = newDay(''); state.days.push(target); }
+          const pid = uid(); if (r.srcUrl) await putSrc(pid, r.srcUrl);
+          target.pages.push({ id: pid, dataUrl: toJpeg(gray(scaleCanvas(big, 1500))), type: 'other', text: '', rot: 0, fp, quadN: r.quadN });
+          continue;
+        }
+        if (isDuplicate(fp, r.text)) { skipped++; continue; }
         // Un "reporte" sin ningún invoice con monto no es reporte: nunca crea día
         if (r.type === 'report' && !Parser.parseSettlement(r.text).rows.some((x) => x.amount != null)) r.type = 'other';
         const photoUrl = toJpeg(gray(scaleCanvas(big, 1500)));
@@ -385,7 +409,7 @@
             || state.days.find((d) => !d.hasReport && compatible(d, rd));
           if (!target) { target = newDay(rd); state.days.push(target); }
           // Un reporte ya leído solo se reemplaza por otro con igual o más facturas (mejor lectura)
-          if (!target.hasReport || parsed.rows.length >= target.rows.length) { applyReport(target, r.text, thumb); target.reportFp = fp; }
+          if (!target.hasReport || parsed.rows.length >= target.rows.length) { applyReport(target, r.text, thumb); target.reportFp = fp; target.reportSig = [...sigOfText(r.text)]; }
           else skipped++;
           cur = target;
         } else {
@@ -398,6 +422,7 @@
           { const pid = uid(); if (r.srcUrl) await putSrc(pid, r.srcUrl); target.pages.push({ id: pid, dataUrl: photoUrl, type: r.type, text: r.text.slice(0, 4000), rot: r.rot, fp, quadN: r.quadN }); }
           cur = target;
         }
+        batchCur = cur;
       }
       await Promise.all(lanesP);
       mergeSameDate(); repairCodes(); reconcile();
@@ -525,7 +550,7 @@
         ${d.hasReport ? '' : '<div class="bad" style="margin:6px 0">⚠ Falta la foto del Settlement Report de este día (de ahí salen los datos de la hoja).</div>'}
         ${d.cash && d.cash.cashSales > 0 ? `<div class="pill" style="margin:6px 0">Efectivo del settlement: $${money(d.cash.cashSales)}</div>` : ''}
         <label>Fecha (MM/DD/AAAA)</label><input type="text" data-f="date" value="${esc(d.date)}" placeholder="10/06/2026">
-        <table><thead><tr><th>Tienda</th><th>Invoice #</th><th>Monto</th><th>Col.</th><th></th></tr></thead><tbody></tbody></table>
+        <table><thead><tr><th>Invoice #</th><th>Monto</th><th>Col.</th><th></th></tr></thead><tbody></tbody></table>
         <div class="row"><button class="sec sm" data-act="addrow">+ fila</button>
           <button class="sec sm" data-act="sort">Ordenar fotos por reporte</button>
           ${d.reportThumb ? '<button class="sec sm" data-act="viewrep">Ver reporte</button>' : ''}</div>
@@ -537,8 +562,7 @@
       const tb = el.querySelector('tbody');
       d.rows.forEach((r, i) => {
         const tr = document.createElement('tr');
-        tr.innerHTML = `<td><input type="text" data-r="${i}" data-k="store" value="${esc(r.store)}" style="width:60px"></td>
-          <td><input type="text" data-r="${i}" data-k="invoice" value="${esc(r.invoice)}"></td>
+        tr.innerHTML = `<td><input type="text" data-r="${i}" data-k="invoice" value="${esc(r.invoice)}"></td>
           <td><input type="text" inputmode="decimal" data-r="${i}" data-k="amount" value="${r.amount ?? ''}" style="width:84px"></td>
           <td><select data-r="${i}" data-k="col"><option value="5"${(r.col ?? (r.amount < 0 ? 6 : 5)) === 5 ? ' selected' : ''}>Charge</option><option value="4"${r.col === 4 ? ' selected' : ''}>Cash</option><option value="6"${(r.col ?? (r.amount < 0 ? 6 : 5)) === 6 ? ' selected' : ''}>Credit</option></select></td>
           <td><button class="danger sm" data-act="delrow" data-r="${i}">×</button></td>`;
